@@ -14,9 +14,9 @@ from musegai import api
 @click.argument("volumes", type=click.Path(exists=True), nargs=-1)
 @click.option("-d", "--dest", type=click.Path(), help="Output directory.")
 @click.option("--model", default="thigh-model3", help="Specify the segmentation model.")
-@click.option("--side", default="left+right", type=click.Choice(api.SIDES), help="Specify the limb's side(s).")
+@click.option("--split", default=0, type=click.Choice([0, 1, 2, None]), help="Split axis")
 @click.option("--tempdir", type=click.Path(exists=True), help="Location for temporary files.")
-def cli(volumes, dest, model, side, tempdir):
+def cli(volumes, dest, model, split, tempdir):
     """Automatic muscle segmentation command line tool.
 
     \b
@@ -42,8 +42,7 @@ def cli(volumes, dest, model, side, tempdir):
             if not match:
                 continue
             name, _ = match.groups()
-            vol = api.Volume.load(file)
-            volumes.setdefault(name, []).append(vol)
+            volumes.setdefault(name, []).append(file)
             if len(volumes[name]) > 2:
                 click.echo(f"Expecting two volume files with prefix: {name}")
         click.echo(f"Found {len(volumes)} volume pair(s) to segment:")
@@ -53,8 +52,8 @@ def cli(volumes, dest, model, side, tempdir):
     elif len(volumes) == 2 and all(pathlib.Path(file).is_file() for file in volumes):
         # individual files
         root = "."
-        volumes = [api.Volume.load(file) for file in volumes]
-        name = volumes[0].info["name"]
+        volumes = [pathlib.Path(file) for file in volumes]
+        name = volumes[0].name
         volumes = {name: volumes}
         click.echo(f"Found one volume pair to segment: {name}")
 
@@ -66,25 +65,25 @@ def cli(volumes, dest, model, side, tempdir):
     # destination
     dest = pathlib.Path(root if dest is None else dest)
     dest.mkdir(exist_ok=True, parents=True)
-    destfiles = {name: (dest / name).with_suffix(volumes[name][0].info["extension"]) for name in volumes}
+    destfiles = {name: dest / name for name in volumes}
     for name in destfiles:
         if destfiles[name].is_file():
             click.echo(f"Output file already exists: {destfiles[name]}, skipping")
             volumes.pop(name)
+            destfiles.pop(name)
 
     if not volumes:
         click.echo("Nothing to do.")
         sys.exit(0)
 
+    # split axis
+    ...
+
     # segment volumes
     click.echo(f"Segmenting {len(volumes)} volume(s)...")
-    segmented, labels = api.segment_volumes(volumes, model, side=side, tempdir=tempdir)
-
-    # save
-    click.echo(f"Saving results to `{dest}`")
-    labels.save(dest / "labels.txt")
-    for name, vol in segmented.items():
-        vol.save(destfiles[name])
+    inputs = list(volumes.values())
+    outputs = list(destfiles.values())
+    api.segment_volumes(model, inputs, outputs, split_axis=split, tempdir=tempdir)
 
     click.echo("Done.")
 
