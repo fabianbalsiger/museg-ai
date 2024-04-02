@@ -1,6 +1,6 @@
 """Command line interface for muscle segmentation."""
 from __future__ import annotations
-
+import logging
 import pathlib
 import re
 import sys
@@ -13,10 +13,12 @@ from musegai import api
 @click.command(context_settings={"show_default": True})
 @click.argument("volumes", type=click.Path(exists=True), nargs=-1)
 @click.option("-d", "--dest", type=click.Path(), help="Output directory.")
+@click.option('-f', '--format', default='.nii.gz', type=click.Choice(['.nii.gz', '.mha', '.mhd', '.hdr']))
 @click.option("--model", default="thigh-model3", help="Specify the segmentation model.")
-@click.option("--split", default=0, type=click.Choice([0, 1, 2, None]), help="Split axis")
+@click.option("--side", default='LR', type=click.Choice(['L', 'R', 'LR', 'NA']), help="Limb's side(s) in image")
+@click.option('-v', '--verbose', is_flag=True, help='Show more information')
 @click.option("--tempdir", type=click.Path(exists=True), help="Location for temporary files.")
-def cli(volumes, dest, model, split, tempdir):
+def cli(volumes, dest, format, model, side, tempdir, verbose):
     """Automatic muscle segmentation command line tool.
 
     \b
@@ -25,6 +27,9 @@ def cli(volumes, dest, model, split, tempdir):
         - two matching Dixon volumes to segment
         - a single directory with numbered pairs of matching Dixon volumes
     """
+    if verbose:
+        logging.basicConfig(level=logging.INFO)
+
     if not volumes:
         # no argument: list available models
         click.echo("Available segmentation models:")
@@ -65,8 +70,8 @@ def cli(volumes, dest, model, split, tempdir):
     # destination
     dest = pathlib.Path(root if dest is None else dest)
     dest.mkdir(exist_ok=True, parents=True)
-    destfiles = {name: dest / name for name in volumes}
-    for name in destfiles:
+    destfiles = {name: (dest / name).with_suffix(format) for name in volumes}
+    for name in list(destfiles):
         if destfiles[name].is_file():
             click.echo(f"Output file already exists: {destfiles[name]}, skipping")
             volumes.pop(name)
@@ -76,14 +81,15 @@ def cli(volumes, dest, model, split, tempdir):
         click.echo("Nothing to do.")
         sys.exit(0)
 
-    # split axis
-    ...
+    # side
+    if side == 'NA':
+        side = None
 
     # segment volumes
     click.echo(f"Segmenting {len(volumes)} volume(s)...")
     inputs = list(volumes.values())
     outputs = list(destfiles.values())
-    api.segment_volumes(model, inputs, outputs, split_axis=split, tempdir=tempdir)
+    api.run_model(model, inputs, outputs, side=side, tempdir=tempdir)
 
     click.echo("Done.")
 

@@ -1,4 +1,5 @@
 import pathlib
+import re
 import numpy as np
 import SimpleITK as sitk
 
@@ -26,16 +27,17 @@ def split(image, axis):
         raise ValueError(f'Invalid axis: {axis}')
     # first half
     slices = [slice(n // 2) if i == axis else slice(None) for i,n in enumerate(image.shape)]
-    first = Image(image.array[slices])
+    first = Image(image.array[tuple(slices)], **image.metadata)
     # second half
     slices = [slice(n // 2, n) if i == axis else slice(None) for i,n in enumerate(image.shape)]
-    origin = image.origin[axis] + image.spacing[axis] * image.shape[axis] // 2
-    second = Image(image.array[slices], origin=origin)
+    origin = list(image.origin)
+    origin[axis] = image.origin[axis] + image.spacing[axis] * image.shape[axis] // 2
+    second = Image(image.array[tuple(slices)], **{**image.metadata, 'origin': origin})
     return first, second
 
 def heal(imageA, imageB, axis):
     """ heal splitted images """
-    arr = np.concatenate(imageA, imageB, axis=axis)
+    arr = np.concatenate([imageA, imageB], axis=axis)
     return Image(arr, **imageA.metadata)
 
 
@@ -73,7 +75,6 @@ class Image:
             "transform": self.transform,
             "info": self.info,
         }
-    
 
 
     def save(self, file, ext=None):
@@ -111,22 +112,89 @@ class Image:
 
 
 class Labels:
-    """Label container."""
+    """dict-like Label container """
+    RE_LABEL = re.compile(r'(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+([\.\d]+)\s+(\d)\s+(\d)\s+"([\w\s]+)"$')
 
-    def __init__(self, data):
-        self.data = data
+    def __init__(self, indices, descriptions, colors=None, transparency=None, visibility=None):
+        self.indices = list(map(int, indices))
+        assert len(descriptions) == len(indices)
+        self.descriptions = list(map(str, descriptions))
+        if colors is not None:
+            assert len(colors) == len(indices)
+            self.colors = list(tuple(map(int, color)) for color in colors)
+        else:
+            self.colors = [tuple(np.randin.randint(0, 255, 3)) for _ in len(indices)]
+        if transparency is not None:
+            assert len(transparency) == len(indices)
+            self.transparency = list(map(float, transparency))
+        else:
+            self.transparency = [1] * len(indices)
+        if visibility is not None:
+            assert len(visibility) == len(indices)
+            self.visibility = list(map(int, visibility))
+        else:
+            self.visibility = [1] * len(indices)
+
+    def __repr__(self):
+        return f'Labels({len(self)})'
+
+    def __len__(self):
+        return len(self.indices)
+
+    def __iter__(self):
+        return iter(self.indices)
+
+    def __getitem__(self, item):
+        dct = dict(*zip(self.indices, self.descriptions))
+        return dct[index]
+
 
     @classmethod
     def load(cls, file):
-        with open(file, encoding="utf-8") as fp:
-            data = fp.read()
-        return cls(data)
-
+        indices, descr, colors, transp, visib = [], [], [], [], []
+        with open(file, 'r') as fp:
+            for line in fp:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                # parse line
+                match = cls.RE_LABEL.match(line)
+                if not match:
+                    raise ValueError(f'Invalid syntax in file {file}: {line}')
+                idx, r, g, b, a, v, m, d = match.groups()
+                indices.append(int(idx))
+                colors.append((int(r), int(g), int(b)))
+                transp.append(float(a))
+                visib.append(int(v))
+                descr.append(d)
+        return Labels(indices, descr, colors, transp, visib)
+    
     @classmethod
     def save(cls, file, labels):
-        assert isinstance(labels, cls)
-        with open(file, "w", encoding="utf-8") as fp:
-            fp.write(labels.data)
+        with open(file, 'w') as fp:
+            fp.write(cls.HEADER)
+            for i in range(len(labels)):
+                idx = labels.indices[i]
+                r, g, b = labels.colors[i]
+                a = labels.transparency[i]
+                v = labels.visibility[i]
+                d = labels.descriptions[i]
+                line = f'{idx:5d} {r:5d} {g:5d} {b:5d} {a:9.2f} {v:2d} {1:2d}    "{d}"\n'
+                fp.write(line)
 
-    def __str__(self) -> str:
-        return str(self.data)
+    HEADER = """################################################
+# Label Description File
+# File format: 
+# IDX   -R-  -G-  -B-  -A--  VIS MSH  LABEL
+# Fields:
+#    IDX:   Zero-based index 
+#    -R-:   Red color component (0..255)
+#    -G-:   Green color component (0..255)
+#    -B-:   Blue color component (0..255)
+#    -A-:   Label transparency (0.00 .. 1.00)
+#    VIS:   Label visibility (0 or 1)
+#    MSH:   Label mesh visibility (0 or 1)
+#  LABEL:   Label description 
+################################################
+"""
+

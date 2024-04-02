@@ -19,6 +19,7 @@ docker/nnUNet_trained_models/*
 
 # Build
 build/
+dist/
 *.egg-info/
 
 # PyCharm

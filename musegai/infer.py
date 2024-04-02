@@ -6,21 +6,27 @@ import numpy as np
 
 from . import io, docker
 
+# tmp
+import ipdb; breakpoint = ipdb.set_trace
+
 LOGGER = logging.getLogger(__name__)
 
 
-def infer(model, images, outputs=None, *, split_axis=None, tempdir=None):
+def infer(model, images, outputs=None, *, side=None, tempdir=None):
     """ run inference on images
     
     Args
         model (str): model name
     """
 
+    if not side in ('LR', 'R', 'L', None):
+        raise ValueError(f'Invalid side: {side}')
+
     # names
     indir = 'in'
     outdir = 'out'
     imagename = 'im_{index:03d}_{side}_{channel:04d}.nii.gz'
-    roiname = 'labels_{index:03d}_{side}.nii.gz'
+    roiname = 'im_{index:03d}_{side}.nii.gz'
     
     nimage = len(images)
     if not isinstance(images[0], (tuple, list)):
@@ -33,11 +39,11 @@ def infer(model, images, outputs=None, *, split_axis=None, tempdir=None):
     if outputs and len(set(outputs)) != nimage:
         raise ValueError('Mismatch in the number of inputs and outputs')
     
-    labelnames = None
+    labels = None
     with tempfile.TemporaryDirectory(dir=tempdir) as tmp:
         LOGGER.info('Setup temporary directory')
         # create folder structure
-        root = pathlib.path(tmp)
+        root = pathlib.Path(tmp)
         (root / indir).mkdir()
         (root / outdir).mkdir()
         
@@ -45,12 +51,12 @@ def infer(model, images, outputs=None, *, split_axis=None, tempdir=None):
         num = 0
         for index in range(nimage):
             LOGGER.info(f'Loading dataset {index + 1}/{nimage}') 
-            if split_axis is not None:
+            if side == 'LR':
                 # split into halves (eg. left and right sides)
                 LOGGER.info(f'Split images into halves')
                 for channel in range(nchannel):
                     image = io.load(images[index][channel])
-                    imageA, imageB = image.split(split_axis)
+                    imageA, imageB = io.split(image, axis=0)
                     io.save(root / indir / imagename.format(index=index, side='A', channel=channel), imageA)
                     io.save(root / indir / imagename.format(index=index, side='B', channel=channel), imageB)
                 num += 2
@@ -61,35 +67,50 @@ def infer(model, images, outputs=None, *, split_axis=None, tempdir=None):
                     io.save(root / indir / imagename.format(index=index, side='X', channel=channel), image)
                 num += 1
         
-        LOGGER.info(f'Done copying data (num. images: {num})')
+        LOGGER.info(f'Done copying data (num. datasets: {num})')
 
         # run model
         docker.run_inference(model, root)
 
         # recover outputs
         labelmaps = []
-        for index in range(num):
-            if split_axis:
+        for index in range(nimage):
+            if side == 'LR':
                 labelmapA = io.load(root / outdir / roiname.format(index=index, side='A'))
                 labelmapB = io.load(root / outdir / roiname.format(index=index, side='B'))
-                labelmap = labelmapA.heal(labelmapB, axis=split_axis)
+                # increment left side
+                max_label = np.max(labelmapA)
+                labelmapB.array[labelmapB.array > 0] += max_label
+                labelmap = io.heal(labelmapA, labelmapB, axis=0)
             else:
                 labelmap = io.load(root / outdir / roiname.format(index=index, side='X'))
 
         labelmaps.append(labelmap)
 
-        if labelnames is None:
+        if labels is None:
             # get label names
-            labelnames = io.Labels.load(root / outdir / 'labels.txt')
+            labels = io.Labels.load(root / outdir / 'labels.txt')
+            if side == 'LR':
+                descr = [d + '_R' if l>0 else d for l,d in zip(labels.indices, labels.descriptions)]
+                descr += [d + '_L' for l,d in zip(labels.indices, labels.descriptions) if l > 0]
+                indices = labels.indices + [l + max_label for l in labels.indices if l > 0 ]
+                colors = labels.colors + [c for l,c in zip(labels.indices, labels.colors) if l > 0]
+                transparency = labels.transparency + [t for l,t in zip(labels.indices, labels.transparency) if l > 0]
+                visibility = labels.visibility + [v for l,v in zip(labels.indices, labels.visibility) if l > 0]
+                labels = io.Labels(indices, descr, colors, transparency, visibility)
+            elif side == 'L':
+                labels.descriptions = [d + '_L' if l>0 else d for l,d in zip(labels.indices, labels.descriptions)]
+            elif side == 'R':
+                labels.descriptions = [d + '_R' if l>0 else d for l,d in zip(labels.indices, labels.descriptions)]
 
 
     # return volumes or files?
     if not outputs:
-        return labelmaps, labelnames
+        return labelmaps, labels
     
     for filename, labelmap in zip(outputs, labelmaps):
         io.save(filename, labelmap)
-    io.Labels.save(outdir / 'labels.txt', labelnames)
+        io.Labels.save(filename.parent / 'labels.txt', labels)
 
     
 
