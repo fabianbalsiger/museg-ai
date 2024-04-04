@@ -27,6 +27,9 @@ def train(model, images, rois, labels, outdir, *, tag=None, split_axis=None, bui
         images: sequence of tuples of files/images
         rois: sequence of files/labelmaps
         labels: ITK label object/file
+        tag: model tag (eg. version)
+        split_axis: split images into left/right parts
+        outdir: output directory for the model files
         tempdir: temporary training directory
     Return
         nnU-net model file
