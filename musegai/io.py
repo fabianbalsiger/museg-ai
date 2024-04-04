@@ -10,21 +10,24 @@ handle labels:
 - skipped label values
 
 """
+
+
 def is_image(obj):
     if isinstance(obj, Image):
         return True
     elif isinstance(obj, (str, pathlib.Path)):
         return Image.is_imagefile(obj)
-    raise TypeError(f'Invalid image object or file: {obj}')
+    raise TypeError(f"Invalid image object or file: {obj}")
 
 
 def load(obj, **kwargs):
-    """ load image file """
+    """load image file"""
     if isinstance(obj, (np.ndarray, Image)):
         # copy image/array obj
         return Image(obj, **kwargs)
     # else assume a file file
     return Image.load(obj, **kwargs)
+
 
 def save(file, image, ext=None):
     image.save(file, ext=ext)
@@ -35,29 +38,30 @@ def load_labels(obj):
         return obj
     elif isinstance(obj, (str, pathlib.Path)):
         return Labels.load(obj)
-    raise TypeError(f'Invalid labels object or file: {obj}')
+    raise TypeError(f"Invalid labels object or file: {obj}")
+
 
 def save_labels(filename, labels):
     Labels.save(filename, labels)
 
 
-
 def split(image, axis):
-    """ split images along axis """
+    """split images along axis"""
     if not axis in tuple(range(image.ndim)):
-        raise ValueError(f'Invalid axis: {axis}')
+        raise ValueError(f"Invalid axis: {axis}")
     # first half
-    slices = [slice(n // 2) if i == axis else slice(None) for i,n in enumerate(image.shape)]
+    slices = [slice(n // 2) if i == axis else slice(None) for i, n in enumerate(image.shape)]
     first = Image(image.array[tuple(slices)], **image.metadata)
     # second half
-    slices = [slice(n // 2, n) if i == axis else slice(None) for i,n in enumerate(image.shape)]
+    slices = [slice(n // 2, n) if i == axis else slice(None) for i, n in enumerate(image.shape)]
     origin = list(image.origin)
     origin[axis] = image.origin[axis] + image.spacing[axis] * image.shape[axis] // 2
-    second = Image(image.array[tuple(slices)], **{**image.metadata, 'origin': origin})
+    second = Image(image.array[tuple(slices)], **{**image.metadata, "origin": origin})
     return first, second
 
+
 def heal(imageA, imageB, axis):
-    """ heal splitted images """
+    """heal splitted images"""
     arr = np.concatenate([imageA, imageB], axis=axis)
     return Image(arr, **imageA.metadata)
 
@@ -133,11 +137,11 @@ class Image:
                 return name, ext
         else:
             raise TypeError(f"Unknown file type: {filename}")
-        
 
 
 class Labels:
-    """dict-like Label container """
+    """dict-like Label container"""
+
     RE_LABEL = re.compile(r'(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+([\.\d]+)\s+(\d)\s+(\d)\s+"([\w\s]+)"$')
 
     def __init__(self, indices, descriptions, colors=None, transparency=None, visibility=None):
@@ -161,7 +165,7 @@ class Labels:
             self.visibility = [1] * len(indices)
 
     def __repr__(self):
-        return f'Labels({len(self)})'
+        return f"Labels({len(self)})"
 
     def __len__(self):
         return len(self.indices)
@@ -173,19 +177,18 @@ class Labels:
         dct = dict(*zip(self.indices, self.descriptions))
         return dct[index]
 
-
     @classmethod
     def load(cls, file):
         indices, descr, colors, transp, visib = [], [], [], [], []
-        with open(file, 'r') as fp:
+        with open(file, "r") as fp:
             for line in fp:
                 line = line.strip()
-                if not line or line.startswith('#'):
+                if not line or line.startswith("#"):
                     continue
                 # parse line
                 match = cls.RE_LABEL.match(line)
                 if not match:
-                    raise ValueError(f'Invalid syntax in file {file}: {line}')
+                    raise ValueError(f"Invalid syntax in file {file}: {line}")
                 idx, r, g, b, a, v, m, d = match.groups()
                 indices.append(int(idx))
                 colors.append((int(r), int(g), int(b)))
@@ -193,10 +196,9 @@ class Labels:
                 visib.append(int(v))
                 descr.append(d)
         return Labels(indices, descr, colors, transp, visib)
-    
 
     def save(self, file):
-        with open(file, 'w') as fp:
+        with open(file, "w") as fp:
             fp.write(self.HEADER)
             for i in range(len(self)):
                 idx = self.indices[i]
@@ -222,4 +224,3 @@ class Labels:
 #  LABEL:   Label description 
 ################################################
 """
-

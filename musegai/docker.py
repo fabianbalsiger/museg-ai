@@ -10,11 +10,12 @@ TODO:
 REPOSITORY = ...
 TRAIN_IMAGE = ...
 
+
 def list_models():
-    """ list existing models """
+    """list existing models"""
     # temp
     return [
-        f'fabianbalsiger/museg:thigh-model3',
+        f"fabianbalsiger/museg:thigh-model3",
     ]
     # client = docker.from_env()
     # images = client.images.search(REPOSITORY)
@@ -37,7 +38,7 @@ def run_inference(model, dirname):
 
 
 def check_training():
-    """ check if training image available """
+    """check if training image available"""
     # TODO
     return True
 
@@ -59,10 +60,12 @@ def run_training(model, indir):
 
 # private
 
+
 def _get_image(model):
     """Get Docker image name."""
     # TODO
     return f"fabianbalsiger/museg:{model}"
+
 
 def _pull_image(image):
     """Pull a Docker image if not exists."""

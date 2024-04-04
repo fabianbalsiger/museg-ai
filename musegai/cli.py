@@ -1,4 +1,5 @@
 """Command line interface for muscle segmentation."""
+
 from __future__ import annotations
 import logging
 import pathlib
@@ -9,18 +10,18 @@ import click
 
 from musegai import api
 
+
 @click.group()
-def cli():
-    ...
+def cli(): ...
 
 
 @cli.command(context_settings={"show_default": True})
 @click.argument("images", type=click.Path(exists=True), nargs=-1)
 @click.option("-d", "--dest", type=click.Path(), help="Output directory.")
-@click.option('-f', '--format', default='.nii.gz', type=click.Choice(['.nii.gz', '.mha', '.mhd', '.hdr']))
+@click.option("-f", "--format", default=".nii.gz", type=click.Choice([".nii.gz", ".mha", ".mhd", ".hdr"]))
 @click.option("--model", default="thigh-model3", help="Specify the segmentation model.")
-@click.option("--side", default='LR', type=click.Choice(['L', 'R', 'LR', 'NA']), help="Limb's side(s) in image")
-@click.option('-v', '--verbose', is_flag=True, help='Show more information')
+@click.option("--side", default="LR", type=click.Choice(["L", "R", "LR", "NA"]), help="Limb's side(s) in image")
+@click.option("-v", "--verbose", is_flag=True, help="Show more information")
 @click.option("--tempdir", type=click.Path(exists=True), help="Location for temporary files.")
 def inter(images, dest, format, model, side, tempdir, verbose):
     """Automatic muscle segmentation command line tool.
@@ -86,7 +87,7 @@ def inter(images, dest, format, model, side, tempdir, verbose):
         sys.exit(0)
 
     # side
-    if side == 'NA':
+    if side == "NA":
         side = None
 
     # segment images
@@ -102,37 +103,37 @@ def inter(images, dest, format, model, side, tempdir, verbose):
 @click.argument("model")
 @click.argument("images")
 @click.argument("rois")
-@click.option("--labelfile", type=click.Path(exists=True), help='ITK-Snap label file')
-@click.option('-r', '--root', type=click.Path(exists=True), help='root directory.')
+@click.option("--labelfile", type=click.Path(exists=True), help="ITK-Snap label file")
+@click.option("-r", "--root", type=click.Path(exists=True), help="root directory.")
 @click.option("-d", "--dest", type=click.Path(), help="Output directory.")
 @click.option("--split", is_flag=True, help="Split datasets into left and right parts")
-@click.option('-v', '--verbose', is_flag=True, help='Show more information')
+@click.option("-v", "--verbose", is_flag=True, help="Show more information")
 @click.option("--tempdir", type=click.Path(exists=True), help="Location for temporary files.")
 def train(model, images, rois, labelfile, root, dest, split, tempdir, verbose):
-    """Create new segmentation model using training images and rois """
+    """Create new segmentation model using training images and rois"""
     # output dir
     if not dest:
-        outdir = pathlib.Path('.') / model
-    if set(pathlib.Path(outdir).glob('*')):
+        outdir = pathlib.Path(".") / model
+    if set(pathlib.Path(outdir).glob("*")):
         click.echo(f"Output folder `{outdir}` is not empty, exiting.")
         sys.exit(1)
 
     # find images
     if pathlib.Path(images).is_absolute():
         # assume a directory
-        image_files = sorted(pathlib.Path(images).rglob('*'))
-        roi_files = sorted(pathlib.Path(rois).rglob('*'))
+        image_files = sorted(pathlib.Path(images).rglob("*"))
+        roi_files = sorted(pathlib.Path(rois).rglob("*"))
     else:
-        root = pathlib.Path(root) if root else pathlib.Path('.')
+        root = pathlib.Path(root) if root else pathlib.Path(".")
         image_files = sorted(root.rglob(images))
         roi_files = sorted(root.rglob(rois))
 
     if not image_files:
-        click.echo(f'No image file found, check expression: {images}')
+        click.echo(f"No image file found, check expression: {images}")
     if not roi_files:
-        click.echo(f'No label file found, check expression: {rois}')
+        click.echo(f"No label file found, check expression: {rois}")
 
-    regex = re.compile(r'(.+?)(\d*)\.([\.\w]+)$')
+    regex = re.compile(r"(.+?)(\d*)\.([\.\w]+)$")
     images = {}
     for file in image_files:
         match = regex.match(str(file))
@@ -146,41 +147,41 @@ def train(model, images, rois, labelfile, root, dest, split, tempdir, verbose):
 
     nimage = len(images)
     if len(rois) != nimage:
-        click.echo(f'Error: found {nimage} images and {len(rois)} rois.')
+        click.echo(f"Error: found {nimage} images and {len(rois)} rois.")
         for ims in images:
             click.echo(f'\t{", ".join(ims)}')
         for im in rois:
-            click.echo(f'\t{rois[im]}')
+            click.echo(f"\t{rois[im]}")
         sys.exit(0)
-    
+
     if not images:
-        click.echo(f'No image files were found')
+        click.echo(f"No image files were found")
         sys.exit(0)
 
     # check num channels
     channels = {len(ims) for ims in images}
     if not channels == {2}:
-        click.echo(f'Error: invalid number of channels (must be 2)')
+        click.echo(f"Error: invalid number of channels (must be 2)")
         for ims in images:
             click.echo(f'\t{", ".join(ims)}')
         sys.exit(0)
 
     # check training data
-    click.echo(f'Found {len(images)} images and matching rois:')
+    click.echo(f"Found {len(images)} images and matching rois:")
     for i in range(nimage):
-        click.echo(f'({i+1})')
-        click.echo(f'\tchan1:  {images[i][0]}')
-        click.echo(f'\tchan2:  {images[i][1]}')
-        click.echo(f'\tlabels: {rois[i]}')
-    ans = click.confirm('Are all images/rois correcly matched?', abort=True)
+        click.echo(f"({i+1})")
+        click.echo(f"\tchan1:  {images[i][0]}")
+        click.echo(f"\tchan2:  {images[i][1]}")
+        click.echo(f"\tlabels: {rois[i]}")
+    ans = click.confirm("Are all images/rois correcly matched?", abort=True)
 
     # label file
     labelnames = labelfile
 
-
     # train model
     split_axis = None if not split else 0
     api.train_model(model, images, rois, labelnames, outdir, split_axis=split_axis, build_image=True, tempdir=tempdir)
+
 
 if __name__ == "__main__":
     cli()  # pylint: disable=no-value-for-parameter
