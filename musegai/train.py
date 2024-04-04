@@ -18,12 +18,14 @@ LOGGER = logging.getLogger(__name__)
 
 """
 
-def train(model, images, labels, labelnames, outdir, *, tag=None, split_axis=None, build_image=True, tempdir=None):
+def train(model, images, rois, labels, outdir, *, tag=None, split_axis=None, build_image=True, tempdir=None):
     """ train new model on provided datasets
     
     Args
         model (str): model name
-        datasets: sequence of tuples
+        images: sequence of tuples of files/images
+        rois: sequence of files/labelmaps
+        labels: ITK label object/file
         tempdir: temporary training directory
     Return
         nnU-net model file
@@ -45,8 +47,8 @@ def train(model, images, labels, labelnames, outdir, *, tag=None, split_axis=Non
 
     
     nimage = len(images)
-    if nimage != len(labels):
-        raise ValueError(f'Number of images and labels do not match')
+    if nimage != len(rois):
+        raise ValueError(f'Number of images and rois do not match')
     if not isinstance(images[0], (tuple, list)):
         images = [(im,) for im in images]
 
@@ -55,7 +57,8 @@ def train(model, images, labels, labelnames, outdir, *, tag=None, split_axis=Non
         raise ValueError(f'Number of channels is not constant')
 
     # check label file
-    labelnames = io.Labels(labelnames)
+    if labels is not None:
+        labels = io.load_labels(labels)
 
     LOGGER.info('Start training (num. images: {nimage}, num. channels: {nchannel})')
 
@@ -63,7 +66,7 @@ def train(model, images, labels, labelnames, outdir, *, tag=None, split_axis=Non
     with tempfile.TemporaryDirectory(dir=tempdir) as tmp:
         LOGGER.info('Setup temporary directory')
         # create folder structure
-        root = pathlib.path(tmp)
+        root = pathlib.Path(tmp)
         (root / imagedir).mkdir()
         (root / labeldir).mkdir()
         
@@ -73,12 +76,18 @@ def train(model, images, labels, labelnames, outdir, *, tag=None, split_axis=Non
             LOGGER.info(f'Loading dataset {index + 1}/{nimage}')
 
             # load labelmap
-            labelmap = io.load(labels[index])
+            labelmap = io.load(rois[index])
 
             # get label values
             _labelset = np.unique(labelmap)
+
+            # check labelset
+            if labels and (not set(_labelset) <= set(labels.indices)):
+                raise ValueError(f'Labels object do not contain all label values')
+
             # make label values contiguous?
             # _labelset, labelmap = np.unique(labelmap, return_index=True)
+
             if labelset is None:
                 labelset = set(_labelset)
             elif labelset != set(_labelset):
@@ -131,6 +140,7 @@ def train(model, images, labels, labelnames, outdir, *, tag=None, split_axis=Non
 
 
         # run nnU-net training
+        breakpoint()
         LOGGER.info(f'Run nnU-net training')    
         docker.run_training(model, tmp)
 
@@ -141,8 +151,9 @@ def train(model, images, labels, labelnames, outdir, *, tag=None, split_axis=Non
         for file in model_data.glob('*'):
             shutil.copyfile(file, outdir / file.name)
 
-        # copy label file
-        io.Labels.save(outdir / 'labels.txt', labelnames)
+        # store label file
+        if labels is not None:
+            io.save_labels(outdir / 'labels.txt', labels)
 
         if build_image:
             # build inference docker

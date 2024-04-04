@@ -10,16 +10,37 @@ handle labels:
 - skipped label values
 
 """
+def is_image(obj):
+    if isinstance(obj, Image):
+        return True
+    elif isinstance(obj, (str, pathlib.Path)):
+        return Image.is_imagefile(obj)
+    raise TypeError(f'Invalid image object or file: {obj}')
+
 
 def load(obj):
     """ load image file """
     if isinstance(obj, np.ndarray):
+        # copy image obj
         return Image(obj)
     # else assume a file file
     return Image.load(obj)
 
 def save(file, image, ext=None):
     image.save(file, ext=ext)
+
+
+def load_labels(obj):
+    if isinstance(obj, Labels):
+        return obj
+    elif isinstance(obj, (str, pathlib.Path)):
+        return Labels.load(obj)
+    raise TypeError(f'Invalid labels object or file: {obj}')
+
+def save_labels(filename, labels):
+    Labels.save(filename, labels)
+
+
 
 def split(image, axis):
     """ split images along axis """
@@ -76,7 +97,6 @@ class Image:
             "info": self.info,
         }
 
-
     def save(self, file, ext=None):
         file = pathlib.Path(file)
         im = sitk.GetImageFromArray(self.array.T)
@@ -98,6 +118,10 @@ class Image:
         transform = im.GetDirection()
         info = {"extension": ext, "name": name}
         return cls(array, origin=origin, spacing=spacing, transform=transform, **info)
+
+    @classmethod
+    def is_imagefile(cls, file):
+        return any(str(file).endswith(suffix) for suffix in cls.EXTENSIONS)
 
     @classmethod
     def _get_file_ext(cls, filename):
@@ -170,15 +194,15 @@ class Labels:
         return Labels(indices, descr, colors, transp, visib)
     
     @classmethod
-    def save(cls, file, labels):
+    def save(cls, file):
         with open(file, 'w') as fp:
             fp.write(cls.HEADER)
-            for i in range(len(labels)):
-                idx = labels.indices[i]
-                r, g, b = labels.colors[i]
-                a = labels.transparency[i]
-                v = labels.visibility[i]
-                d = labels.descriptions[i]
+            for i in range(len(self)):
+                idx = self.indices[i]
+                r, g, b = self.colors[i]
+                a = self.transparency[i]
+                v = self.visibility[i]
+                d = self.descriptions[i]
                 line = f'{idx:5d} {r:5d} {g:5d} {b:5d} {a:9.2f} {v:2d} {1:2d}    "{d}"\n'
                 fp.write(line)
 

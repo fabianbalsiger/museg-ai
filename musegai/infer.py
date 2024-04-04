@@ -89,7 +89,7 @@ def infer(model, images, outputs=None, *, side=None, tempdir=None):
 
         if labels is None:
             # get label names
-            labels = io.Labels.load(root / outdir / 'labels.txt')
+            labels = io.load_labels(root / outdir / 'labels.txt')
             if side == 'LR':
                 descr = [d + '_R' if l>0 else d for l,d in zip(labels.indices, labels.descriptions)]
                 descr += [d + '_L' for l,d in zip(labels.indices, labels.descriptions) if l > 0]
@@ -110,7 +110,7 @@ def infer(model, images, outputs=None, *, side=None, tempdir=None):
     
     for filename, labelmap in zip(outputs, labelmaps):
         io.save(filename, labelmap)
-        io.Labels.save(filename.parent / 'labels.txt', labels)
+        io.save_labels(filename.parent / 'labels.txt', labels)
 
     
 
