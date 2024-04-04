@@ -18,13 +18,13 @@ def is_image(obj):
     raise TypeError(f'Invalid image object or file: {obj}')
 
 
-def load(obj):
+def load(obj, **kwargs):
     """ load image file """
-    if isinstance(obj, np.ndarray):
-        # copy image obj
-        return Image(obj)
+    if isinstance(obj, (np.ndarray, Image)):
+        # copy image/array obj
+        return Image(obj, **kwargs)
     # else assume a file file
-    return Image.load(obj)
+    return Image.load(obj, **kwargs)
 
 def save(file, image, ext=None):
     image.save(file, ext=ext)
@@ -69,7 +69,7 @@ class Image:
 
     def __init__(self, obj, **meta):
         try:
-            self.array = obj if isinstance(obj, np.ndarray) else np.asarray(getattr(obj, "array"))
+            self.array = obj if isinstance(obj, np.ndarray) else np.asarray(obj)
             self.origin = meta.pop("origin", None) or getattr(obj, "origin")
             self.spacing = meta.pop("spacing", None) or getattr(obj, "spacing")
             self.transform = meta.pop("transform", None) or getattr(obj, "transform")
@@ -108,7 +108,7 @@ class Image:
         sitk.WriteImage(im, file)
 
     @classmethod
-    def load(cls, file):
+    def load(cls, file, **kwargs):
         file = pathlib.Path(file)
         name, ext = cls._get_file_ext(file)
         im = sitk.ReadImage(file)
@@ -117,7 +117,8 @@ class Image:
         origin = im.GetOrigin()
         transform = im.GetDirection()
         info = {"extension": ext, "name": name}
-        return cls(array, origin=origin, spacing=spacing, transform=transform, **info)
+
+        return cls(array, origin=origin, spacing=spacing, transform=transform, info=info, **kwargs)
 
     @classmethod
     def is_imagefile(cls, file):
@@ -193,10 +194,10 @@ class Labels:
                 descr.append(d)
         return Labels(indices, descr, colors, transp, visib)
     
-    @classmethod
-    def save(cls, file):
+
+    def save(self, file):
         with open(file, 'w') as fp:
-            fp.write(cls.HEADER)
+            fp.write(self.HEADER)
             for i in range(len(self)):
                 idx = self.indices[i]
                 r, g, b = self.colors[i]

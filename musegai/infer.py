@@ -11,6 +11,22 @@ import ipdb; breakpoint = ipdb.set_trace
 
 LOGGER = logging.getLogger(__name__)
 
+def tame_side(side):
+    if side is None:
+        return 'NA'
+    elif not isinstance(side, str):
+        raise TypeError(f'Invalid side value: {side}')
+    side = side.upper().strip().replace(',', '').replace('+', '')
+    if side in ['LEFT', 'L']:
+        return 'L'
+    elif side in ['RIGHT', 'R']:
+        return 'R'
+    elif side in ['LR', 'RL', 'LEFTRIGHT', 'RIGHTLEFT']:
+        return 'LR'
+    elif side.upper() in ['NONE', 'NA']:
+        return 'NA'
+    raise ValueError(f'Unknown side value: {side}')
+
 
 def infer(model, images, outputs=None, *, side=None, tempdir=None):
     """ run inference on images
@@ -18,9 +34,7 @@ def infer(model, images, outputs=None, *, side=None, tempdir=None):
     Args
         model (str): model name
     """
-
-    if not side in ('LR', 'R', 'L', None):
-        raise ValueError(f'Invalid side: {side}')
+    side = tame_side(side)
 
     # names
     indir = 'in'
@@ -73,7 +87,7 @@ def infer(model, images, outputs=None, *, side=None, tempdir=None):
         docker.run_inference(model, root)
 
         # recover outputs
-        labelmaps = []
+        rois = []
         for index in range(nimage):
             if side == 'LR':
                 labelmapA = io.load(root / outdir / roiname.format(index=index, side='A'))
@@ -85,7 +99,7 @@ def infer(model, images, outputs=None, *, side=None, tempdir=None):
             else:
                 labelmap = io.load(root / outdir / roiname.format(index=index, side='X'))
 
-        labelmaps.append(labelmap)
+        rois.append(labelmap)
 
         if labels is None:
             # get label names
@@ -106,9 +120,9 @@ def infer(model, images, outputs=None, *, side=None, tempdir=None):
 
     # return volumes or files?
     if not outputs:
-        return labelmaps, labels
+        return rois, labels
     
-    for filename, labelmap in zip(outputs, labelmaps):
+    for filename, labelmap in zip(outputs, rois):
         io.save(filename, labelmap)
         io.save_labels(filename.parent / 'labels.txt', labels)
 
