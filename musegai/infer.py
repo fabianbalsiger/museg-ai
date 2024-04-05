@@ -6,11 +6,6 @@ import numpy as np
 
 from . import io, docker
 
-# tmp
-import ipdb
-
-breakpoint = ipdb.set_trace
-
 LOGGER = logging.getLogger(__name__)
 
 
