@@ -41,8 +41,8 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
     # names
     imagedir = "imagesTr"
     labeldir = "labelsTr"
-    imagename = "training_{index:03d}_{side}_{channel:04d}.nii.gz"
-    roiname = "training_{index:03d}_{side}.nii.gz"
+    imagename = "training_{num:03d}_{channel:04d}.nii.gz"
+    roiname = "training_{num:03d}_.nii.gz"
 
     # output model directory
     outdir = pathlib.Path(outdir)
@@ -102,29 +102,28 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
                 labelsA, labelsB = labelmap.split(split_axis)
                 keepA, keepB = np.any(labelsA > 0), np.any(labelsB > 0)
 
-                # store labelmaps
                 if keepA:
-                    io.save(root / labeldir / roiname.format(index=index, side="A"), labelsA)
-                    num += 1
-                if keepB:
-                    io.save(root / labeldir / roiname.format(index=index, side="B"), labelsB)
+                    io.save(root / labeldir / roiname.format(num=num), labelsA)
+                    for channel in range(nchannel):
+                        image = io.load(images[index][channel])
+                        imageA, _ = io.split(image, split_axis)
+                        io.save(root / imagedir / imagename.format(num=num, channel=channel), imageA)
                     num += 1
 
-                # store channels
-                for channel in range(nchannel):
-                    image = io.load(images[index][channel])
-                    imageA, imageB = io.split(image, split_axis)
-                    if keepA:
-                        io.save(root / imagedir / imagename.format(index=index, side="A", channel=channel), imageA)
-                    if keepB:
-                        io.save(root / imagedir / imagename.format(index=index, side="B", channel=channel), imageB)
+                if keepB:
+                    io.save(root / labeldir / roiname.format(num=num), labelsB)
+                    for channel in range(nchannel):
+                        image = io.load(images[index][channel])
+                        _, imageB = io.split(image, split_axis)
+                        io.save(root / imagedir / imagename.format(num=num, channel=channel), imageB)
+                    num += 1
 
             else:
                 # do not split
-                io.save(root / labeldir / roiname.format(index=index, side="X"), labelmap)
+                io.save(root / labeldir / roiname.format(num=num, side="X"), labelmap)
                 for channel in range(nchannel):
                     image = io.load(images[index][channel])
-                    io.save(root / imagedir / imagename.format(index=index, side="X", channel=channel), image)
+                    io.save(root / imagedir / imagename.format(num=num, side="X", channel=channel), image)
                 num += 1
 
         LOGGER.info(f"Done copying training data (num. training: {num})")
