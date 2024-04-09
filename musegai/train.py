@@ -129,9 +129,9 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
         LOGGER.info(f"Done copying training data (num. training: {num})")
 
         # metadata
-        channel_names = {f'{i}': f'mag{i:02d}' for i in range(nchannel)}
+        channel_names = {f"{i}": f"mag{i:02d}" for i in range(nchannel)}
         label_names = dict(zip(labels.descriptions, labels.indices))
-        
+
         # store JSON metadata
         meta = {
             "channel_names": channel_names,

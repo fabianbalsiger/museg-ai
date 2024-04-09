@@ -44,9 +44,10 @@ def load_labels(obj):
 def save_labels(filename, labels):
     Labels.save(filename, labels)
 
+
 def init_labels(num):
     indices = list(range(num))
-    descr = [f'Label {i + 1}' for i in range(num)]
+    descr = [f"Label {i + 1}" for i in range(num)]
     return Labels(indices, descr)
 
 
@@ -181,11 +182,11 @@ class Labels:
     def __getitem__(self, item):
         dct = dict(*zip(self.indices, self.descriptions))
         return dct[item]
-    
+
     def subset(self, indices, reindex=True):
         num = len(indices)
         return Labels(
-            list(range(num)) if reindex else indices, 
+            list(range(num)) if reindex else indices,
             [self.descriptions[i] for i in indices],
             [self.colors[i] for i in indices],
             [self.transparency[i] for i in indices],
