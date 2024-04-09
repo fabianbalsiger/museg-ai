@@ -91,11 +91,11 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
                 else:
                     # check label indices
                     if not labelset <= set(labels.indices):
-                        raise ValueError(f"Labels object do not contain all label values")
+                        raise ValueError(f"Labels object does not contain all label values")
                     # reindex labels
                     labels = labels.subset(labelset, reindex=True)
             elif labelset != set(_labelset):
-                raise ValueError(f"Inconsistent number of label values")
+                raise ValueError(f"Inconsistent label values")
 
             if split_axis is not None:
                 # split into halves (eg. left and right sides)
