@@ -19,7 +19,7 @@ LOGGER = logging.getLogger(__name__)
 """
 
 
-def train(model, images, rois, labels, outdir, *, tag=None, split_axis=None, build_image=True, tempdir=None):
+def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None, build_image=True, tempdir=None):
     """train new model on provided datasets
 
     Args
@@ -64,8 +64,6 @@ def train(model, images, rois, labels, outdir, *, tag=None, split_axis=None, bui
         labels = io.load_labels(labels)
 
     LOGGER.info("Start training (num. images: {nimage}, num. channels: {nchannel})")
-
-    labelset = None
     with tempfile.TemporaryDirectory(dir=tempdir) as tmp:
         LOGGER.info("Setup temporary directory")
         # create folder structure
@@ -75,24 +73,27 @@ def train(model, images, rois, labels, outdir, *, tag=None, split_axis=None, bui
 
         # check and copy each volume
         num = 0
+        labelset = None
         for index in range(nimage):
             LOGGER.info(f"Loading dataset {index + 1}/{nimage}")
 
             # load labelmap
             labelmap = io.load(rois[index])
 
-            # get label values
-            _labelset = np.unique(labelmap)
+            # make label values contiguous
+            _labelset, labelmap = np.unique(labelmap, return_index=True)
 
-            # check labelset
-            if labels and (not set(_labelset) <= set(labels.indices)):
-                raise ValueError(f"Labels object do not contain all label values")
-
-            # make label values contiguous?
-            # _labelset, labelmap = np.unique(labelmap, return_index=True)
-
+            # setup labels
             if labelset is None:
                 labelset = set(_labelset)
+                if labels is None:
+                    labels = io.init_labels(len(labelset))
+                else:
+                    # check label indices
+                    if not labelset <= set(labels.indices):
+                        raise ValueError(f"Labels object do not contain all label values")
+                    # reindex labels
+                    labels = labels.subset(labelset, reindex=True)
             elif labelset != set(_labelset):
                 raise ValueError(f"Inconsistent number of label values")
 
@@ -129,8 +130,8 @@ def train(model, images, rois, labels, outdir, *, tag=None, split_axis=None, bui
         LOGGER.info(f"Done copying training data (num. training: {num})")
 
         # label names
-        label_names = {f"label_{l}": i for i, l in enumerate(labelset)}
-
+        label_names = dict(zip(labels.descriptions, labels.indices))
+        
         # store JSON metadata
         meta = {
             "channel_names": ["zscore"] * nchannel,
@@ -154,8 +155,7 @@ def train(model, images, rois, labels, outdir, *, tag=None, split_axis=None, bui
             shutil.copyfile(file, outdir / file.name)
 
         # store label file
-        if labels is not None:
-            io.save_labels(outdir / "labels.txt", labels)
+        io.save_labels(outdir / "labels.txt", labels)
 
         if build_image:
             # build inference docker
