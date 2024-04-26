@@ -42,7 +42,7 @@ def load_labels(obj):
 
 
 def save_labels(filename, labels):
-    Labels.save(filename, labels)
+    labels.save(filename)
 
 
 def split(image, axis):
