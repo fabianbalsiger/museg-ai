@@ -104,12 +104,13 @@ def infer(images, dest, format, model, side, tempdir, verbose):
 @click.argument("images")
 @click.argument("rois")
 @click.option("--labelfile", type=click.Path(exists=True), help="ITK-Snap label file")
+@click.option("--nchannel", type=int, default=2, help='Expected number of channels')
 @click.option("-r", "--root", type=click.Path(exists=True), help="root directory.")
 @click.option("-d", "--dest", type=click.Path(), help="Output directory.")
 @click.option("--split", is_flag=True, help="Split datasets into left and right parts")
 @click.option("-v", "--verbose", is_flag=True, help="Show more information")
 @click.option("--tempdir", type=click.Path(exists=True), help="Location for temporary files.")
-def train(model, images, rois, labelfile, root, dest, split, tempdir, verbose):
+def train(model, images, rois, nchannel, labelfile, root, dest, split, tempdir, verbose):
     """Create new segmentation model using training images and rois"""
     # output dir
     if not dest:
@@ -142,16 +143,16 @@ def train(model, images, rois, labelfile, root, dest, split, tempdir, verbose):
         common, index, ext = match.groups()
         images.setdefault(common, []).append(file)
 
-    images = [tuple(sorted(images[im])) for im in sorted(images)]
+    images = [tuple(sorted(images[im]))[:nchannel] for im in sorted(images)]
     rois = sorted(file for file in roi_files if api.is_image(file))
 
     nimage = len(images)
     if len(rois) != nimage:
         click.echo(f"Error: found {nimage} images and {len(rois)} rois.")
         for ims in images:
-            click.echo(f'\t{", ".join(ims)}')
+            click.echo(f'\t{", ".join(map(str, ims))}')
         for im in rois:
-            click.echo(f"\t{rois[im]}")
+            click.echo(f"\t{im}")
         sys.exit(0)
 
     if not images:
@@ -160,10 +161,10 @@ def train(model, images, rois, labelfile, root, dest, split, tempdir, verbose):
 
     # check num channels
     channels = {len(ims) for ims in images}
-    if not channels == {2}:
+    if not channels == {nchannel}:
         click.echo(f"Error: invalid number of channels (must be 2)")
         for ims in images:
-            click.echo(f'\t{", ".join(ims)}')
+            click.echo(f'\t{", ".join(map(str, ims))}')
         sys.exit(0)
 
     # check training data
