@@ -175,12 +175,9 @@ def train(model, images, rois, labelfile, root, dest, split, tempdir, verbose):
         click.echo(f"\tlabels: {rois[i]}")
     ans = click.confirm("Are all images/rois correcly matched?", abort=True)
 
-    # label file
-    labelnames = labelfile
-
     # train model
     split_axis = None if not split else 0
-    api.train_model(model, images, rois, labelnames, outdir, split_axis=split_axis, build_image=True, tempdir=tempdir)
+    api.train_model(model, images, rois, outdir, labels=labelfile, split_axis=split_axis, build_image=True, tempdir=tempdir)
 
 
 if __name__ == "__main__":

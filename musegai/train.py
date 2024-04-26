@@ -19,7 +19,7 @@ LOGGER = logging.getLogger(__name__)
 """
 
 
-def train(model, images, rois, labels, outdir, *, tag=None, split_axis=None, build_image=True, tempdir=None):
+def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None, build_image=True, tempdir=None):
     """train new model on provided datasets
 
     Args
@@ -41,8 +41,8 @@ def train(model, images, rois, labels, outdir, *, tag=None, split_axis=None, bui
     # names
     imagedir = "imagesTr"
     labeldir = "labelsTr"
-    imagename = "training_{index:03d}_{side}_{channel:04d}.nii.gz"
-    roiname = "training_{index:03d}_{side}.nii.gz"
+    imagename = "training_{num:03d}_{channel:04d}.nii.gz"
+    roiname = "training_{num:03d}_.nii.gz"
 
     # output model directory
     outdir = pathlib.Path(outdir)
@@ -64,8 +64,6 @@ def train(model, images, rois, labels, outdir, *, tag=None, split_axis=None, bui
         labels = io.load_labels(labels)
 
     LOGGER.info("Start training (num. images: {nimage}, num. channels: {nchannel})")
-
-    labelset = None
     with tempfile.TemporaryDirectory(dir=tempdir) as tmp:
         LOGGER.info("Setup temporary directory")
         # create folder structure
@@ -75,68 +73,72 @@ def train(model, images, rois, labels, outdir, *, tag=None, split_axis=None, bui
 
         # check and copy each volume
         num = 0
+        labelset = None
         for index in range(nimage):
             LOGGER.info(f"Loading dataset {index + 1}/{nimage}")
 
             # load labelmap
             labelmap = io.load(rois[index])
 
-            # get label values
-            _labelset = np.unique(labelmap)
+            # make label values contiguous
+            _labelset, labelmap = np.unique(labelmap, return_index=True)
 
-            # check labelset
-            if labels and (not set(_labelset) <= set(labels.indices)):
-                raise ValueError(f"Labels object do not contain all label values")
-
-            # make label values contiguous?
-            # _labelset, labelmap = np.unique(labelmap, return_index=True)
-
+            # setup labels
             if labelset is None:
                 labelset = set(_labelset)
+                if labels is None:
+                    labels = io.init_labels(len(labelset))
+                else:
+                    # check label indices
+                    if not labelset <= set(labels.indices):
+                        raise ValueError(f"Labels object does not contain all label values")
+                    # reindex labels
+                    labels = labels.subset(labelset, reindex=True)
             elif labelset != set(_labelset):
-                raise ValueError(f"Inconsistent number of label values")
+                raise ValueError(f"Inconsistent label values")
 
             if split_axis is not None:
                 # split into halves (eg. left and right sides)
                 labelsA, labelsB = labelmap.split(split_axis)
                 keepA, keepB = np.any(labelsA > 0), np.any(labelsB > 0)
 
-                # store labelmaps
                 if keepA:
-                    io.save(root / labeldir / roiname.format(index=index, side="A"), labelsA)
-                    num += 1
-                if keepB:
-                    io.save(root / labeldir / roiname.format(index=index, side="B"), labelsB)
+                    io.save(root / labeldir / roiname.format(num=num), labelsA)
+                    for channel in range(nchannel):
+                        image = io.load(images[index][channel])
+                        imageA, _ = io.split(image, split_axis)
+                        io.save(root / imagedir / imagename.format(num=num, channel=channel), imageA)
                     num += 1
 
-                # store channels
-                for channel in range(nchannel):
-                    image = io.load(images[index][channel])
-                    imageA, imageB = io.split(image, split_axis)
-                    if keepA:
-                        io.save(root / imagedir / imagename.format(index=index, side="A", channel=channel), imageA)
-                    if keepB:
-                        io.save(root / imagedir / imagename.format(index=index, side="B", channel=channel), imageB)
+                if keepB:
+                    io.save(root / labeldir / roiname.format(num=num), labelsB)
+                    for channel in range(nchannel):
+                        image = io.load(images[index][channel])
+                        _, imageB = io.split(image, split_axis)
+                        io.save(root / imagedir / imagename.format(num=num, channel=channel), imageB)
+                    num += 1
 
             else:
                 # do not split
-                io.save(root / labeldir / roiname.format(index=index, side="X"), labelmap)
+                io.save(root / labeldir / roiname.format(num=num, side="X"), labelmap)
                 for channel in range(nchannel):
                     image = io.load(images[index][channel])
-                    io.save(root / imagedir / imagename.format(index=index, side="X", channel=channel), image)
+                    io.save(root / imagedir / imagename.format(num=num, side="X", channel=channel), image)
                 num += 1
 
         LOGGER.info(f"Done copying training data (num. training: {num})")
 
-        # label names
-        label_names = {f"label_{l}": i for i, l in enumerate(labelset)}
+        # metadata
+        channel_names = {f"{i}": f"mag{i:02d}" for i in range(nchannel)}
+        label_names = dict(zip(labels.descriptions, labels.indices))
 
         # store JSON metadata
         meta = {
-            "channel_names": ["zscore"] * nchannel,
+            "channel_names": channel_names,
             "labels": label_names,
             "numTraining": num,
             "file_ending": ".nii.gz",
+            "overwrite_image_reader_writer": "SimpleITKIO",
         }
         with open(root / "datasets.json", "w+") as fp:
             json.dump(meta, fp)
@@ -154,8 +156,7 @@ def train(model, images, rois, labels, outdir, *, tag=None, split_axis=None, bui
             shutil.copyfile(file, outdir / file.name)
 
         # store label file
-        if labels is not None:
-            io.save_labels(outdir / "labels.txt", labels)
+        io.save_labels(outdir / "labels.txt", labels)
 
         if build_image:
             # build inference docker
