@@ -23,7 +23,7 @@ def cli(): ...
 @click.option("--side", default="LR", type=click.Choice(["L", "R", "LR", "NA"]), help="Limb's side(s) in image")
 @click.option("-v", "--verbose", is_flag=True, help="Show more information")
 @click.option("--tempdir", type=click.Path(exists=True), help="Location for temporary files.")
-def inter(images, dest, format, model, side, tempdir, verbose):
+def infer(images, dest, format, model, side, tempdir, verbose):
     """Automatic muscle segmentation command line tool.
 
     \b
