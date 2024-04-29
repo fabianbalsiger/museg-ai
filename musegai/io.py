@@ -152,23 +152,24 @@ class Labels:
 
     def __init__(self, indices, descriptions, colors=None, transparency=None, visibility=None):
         self.indices = list(map(int, indices))
-        assert len(descriptions) == len(indices)
+        nlabels = len(self.indices)
+        assert len(descriptions) == nlabels
         self.descriptions = list(map(str, descriptions))
         if colors is not None:
-            assert len(colors) == len(indices)
+            assert len(colors) == nlabels
             self.colors = list(tuple(map(int, color)) for color in colors)
         else:
-            self.colors = [tuple(np.randin.randint(0, 255, 3)) for _ in len(indices)]
+            self.colors = [tuple(np.random.randint(0, 255, 3)) for _ in range(nlabels)]
         if transparency is not None:
-            assert len(transparency) == len(indices)
+            assert len(transparency) == nlabels
             self.transparency = list(map(float, transparency))
         else:
-            self.transparency = [1] * len(indices)
+            self.transparency = [1] * nlabels
         if visibility is not None:
-            assert len(visibility) == len(indices)
+            assert len(visibility) == nlabels
             self.visibility = list(map(int, visibility))
         else:
-            self.visibility = [1] * len(indices)
+            self.visibility = [1] * nlabels
 
     def __repr__(self):
         return f"Labels({len(self)})"

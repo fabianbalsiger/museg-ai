@@ -8,7 +8,7 @@ TODO:
 
 # repository
 REPOSITORY = ...
-TRAIN_IMAGE = ...
+TRAIN_IMAGE = 'fabianbalsiger/museg-train:v1.0.0'
 
 
 def list_models():
@@ -47,14 +47,14 @@ def run_training(model, indir):
     """Run training"""
     # TODO
     client = docker.from_env()
-    image = _get_image(TRAIN_IMAGE)
+    image = TRAIN_IMAGE
     _pull_image(image)
     print(f"Training model '{model}'")
     client.containers.run(
         image,
         remove=True,
         device_requests=[docker.types.DeviceRequest(device_ids=["all"], capabilities=[["gpu"]])],
-        volumes={indir.parent: {"bind": "/data", "mode": "rw"}},
+        volumes={indir: {"bind": "/data", "mode": "rw"}},
     )
 
 

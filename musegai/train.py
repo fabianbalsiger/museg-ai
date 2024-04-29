@@ -81,7 +81,8 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
             labelmap = io.load(rois[index])
 
             # make label values contiguous
-            _labelset, labelmap = np.unique(labelmap, return_index=True)
+            _labelset, array = np.unique(labelmap, return_inverse=True)
+            labelmap.array = array.reshape(labelmap.shape)
 
             # setup labels
             if labelset is None:
@@ -95,7 +96,7 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
                     # reindex labels
                     labels = labels.subset(labelset, reindex=True)
             elif labelset != set(_labelset):
-                raise ValueError(f"Inconsistent label values")
+                raise ValueError(f"Inconsistent label values in dataset {index}: {labelset} != {_labelset}")
 
             if split_axis is not None:
                 # split into halves (eg. left and right sides)

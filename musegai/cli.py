@@ -171,8 +171,8 @@ def train(model, images, rois, nchannel, labelfile, root, dest, split, tempdir, 
     click.echo(f"Found {len(images)} images and matching rois:")
     for i in range(nimage):
         click.echo(f"({i+1})")
-        click.echo(f"\tchan1:  {images[i][0]}")
-        click.echo(f"\tchan2:  {images[i][1]}")
+        for j in range(nchannel):
+            click.echo(f"\tchan1:  {images[i][j]}")
         click.echo(f"\tlabels: {rois[i]}")
     ans = click.confirm("Are all images/rois correcly matched?", abort=True)
 
