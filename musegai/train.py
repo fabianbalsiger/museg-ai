@@ -42,7 +42,7 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
     imagedir = "imagesTr"
     labeldir = "labelsTr"
     imagename = "training_{num:03d}_{channel:04d}.nii.gz"
-    roiname = "training_{num:03d}_.nii.gz"
+    roiname = "training_{num:03d}.nii.gz"
 
     # output model directory
     outdir = pathlib.Path(outdir)
@@ -64,12 +64,24 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
         labels = io.load_labels(labels)
 
     LOGGER.info("Start training (num. images: {nimage}, num. channels: {nchannel})")
-    with tempfile.TemporaryDirectory(dir=tempdir) as tmp:
+    #with tempfile.TemporaryDirectory(dir=tempdir) as tmp:
+    tmp = pathlib.Path(tempdir or 'tmp')
+    if tmp.exists():
+        shutil.rmtree(tmp)
+    tmp.mkdir(exist_ok=True, parents=True)
+
+    if 1:
+
         LOGGER.info("Setup temporary directory")
         # create folder structure
         root = pathlib.Path(tmp)
-        (root / imagedir).mkdir()
-        (root / labeldir).mkdir()
+        (root / "nnUNet_raw").mkdir()
+        (root / "nnUNet_results").mkdir()
+        (root / "nnUNet_preprocessed").mkdir()
+        data_dir=root/"nnUNet_raw/Dataset001"
+        data_dir.mkdir()
+        (data_dir / imagedir).mkdir()
+        (data_dir / labeldir).mkdir()
 
         # check and copy each volume
         num = 0
@@ -104,27 +116,27 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
                 keepA, keepB = np.any(labelsA > 0), np.any(labelsB > 0)
 
                 if keepA:
-                    io.save(root / labeldir / roiname.format(num=num), labelsA)
+                    io.save(data_dir / labeldir / roiname.format(num=num), labelsA)
                     for channel in range(nchannel):
                         image = io.load(images[index][channel])
                         imageA, _ = io.split(image, split_axis)
-                        io.save(root / imagedir / imagename.format(num=num, channel=channel), imageA)
+                        io.save(data_dir / imagedir / imagename.format(num=num, channel=channel), imageA)
                     num += 1
 
                 if keepB:
-                    io.save(root / labeldir / roiname.format(num=num), labelsB)
+                    io.save(data_dir / labeldir / roiname.format(num=num), labelsB)
                     for channel in range(nchannel):
                         image = io.load(images[index][channel])
                         _, imageB = io.split(image, split_axis)
-                        io.save(root / imagedir / imagename.format(num=num, channel=channel), imageB)
+                        io.save(data_dir / imagedir / imagename.format(num=num, channel=channel), imageB)
                     num += 1
 
             else:
                 # do not split
-                io.save(root / labeldir / roiname.format(num=num, side="X"), labelmap)
+                io.save(data_dir / labeldir / roiname.format(num=num, side="X"), labelmap)
                 for channel in range(nchannel):
                     image = io.load(images[index][channel])
-                    io.save(root / imagedir / imagename.format(num=num, side="X", channel=channel), image)
+                    io.save(data_dir / imagedir / imagename.format(num=num, side="X", channel=channel), image)
                 num += 1
 
         LOGGER.info(f"Done copying training data (num. training: {num})")
@@ -132,6 +144,7 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
         # metadata
         channel_names = {f"{i}": f"mag{i:02d}" for i in range(nchannel)}
         label_names = dict(zip(labels.descriptions, labels.indices))
+        label_names['background']=0
 
         # store JSON metadata
         meta = {
@@ -141,7 +154,7 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
             "file_ending": ".nii.gz",
             "overwrite_image_reader_writer": "SimpleITKIO",
         }
-        with open(root / "datasets.json", "w+") as fp:
+        with open(data_dir/ "dataset.json", "w+") as fp:
             json.dump(meta, fp)
 
         # run nnU-net training

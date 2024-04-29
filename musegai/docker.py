@@ -42,20 +42,38 @@ def check_training():
     # TODO
     return True
 
-
+import pathlib
 def run_training(model, indir):
     """Run training"""
     # TODO
+    indir = pathlib.Path(indir).resolve()
     client = docker.from_env()
     image = TRAIN_IMAGE
     _pull_image(image)
     print(f"Training model '{model}'")
-    client.containers.run(
+    container=client.containers.run(
         image,
-        remove=True,
+        "001 3d_fullres 2",
+        remove=False,
+        # auto_remove=False,
         device_requests=[docker.types.DeviceRequest(device_ids=["all"], capabilities=[["gpu"]])],
         volumes={indir: {"bind": "/data", "mode": "rw"}},
+        # volumes={
+        #     indir / 'nnUNet_raw': {"bind": "/nnUNet_raw", "mode": "rw"},
+        #     indir / 'nnUNet_results': {"bind": "/nnUNet_results", "mode": "rw"},
+        #     indir / 'nnUNet_preprocessed': {"bind": "/nnUNet_preprocessed", "mode": "rw"},
+        # },
+        # environment={"nnUNet_raw":"/data/nnUNet_raw",
+        #              "nnUNet_results":"/data/nnUNet_results",
+        #              "nnUNet_preprocessed":"/data/nnUNet_preprocessed"},
+        detach=True
+        
     )
+
+    #affichage des logs du container pour debuggage:
+    for line in container.logs(stream=True,follow=True):
+        print(line.decode('utf-8').strip())
+
 
 
 # private
