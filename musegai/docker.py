@@ -51,24 +51,19 @@ def run_training(model, indir):
     image = TRAIN_IMAGE
     _pull_image(image)
     print(f"Training model '{model}'")
-    container=client.containers.run(
-        image,
-        "001 3d_fullres 2",
-        remove=False,
-        # auto_remove=False,
-        device_requests=[docker.types.DeviceRequest(device_ids=["all"], capabilities=[["gpu"]])],
-        volumes={indir: {"bind": "/data", "mode": "rw"}},
-        # volumes={
-        #     indir / 'nnUNet_raw': {"bind": "/nnUNet_raw", "mode": "rw"},
-        #     indir / 'nnUNet_results': {"bind": "/nnUNet_results", "mode": "rw"},
-        #     indir / 'nnUNet_preprocessed': {"bind": "/nnUNet_preprocessed", "mode": "rw"},
-        # },
-        # environment={"nnUNet_raw":"/data/nnUNet_raw",
-        #              "nnUNet_results":"/data/nnUNet_results",
-        #              "nnUNet_preprocessed":"/data/nnUNet_preprocessed"},
-        detach=True
-        
-    )
+    def run(cmd, detach=True):
+        return client.containers.run(
+            image,
+            #"001 3d_fullres 2",
+            entrypoint=cmd,
+            remove=False,
+            ipc_mode='host',
+            device_requests=[docker.types.DeviceRequest(device_ids=["all"], capabilities=[["gpu"]])],
+            volumes={indir: {"bind": "/data", "mode": "rw"}},
+            detach=detach
+        )
+    run('nnUNetv2_plan_and_preprocess -d 001 -c 3d_fullres --verify_dataset_integrity', detach=False )
+    container = run('nnUNetv2_train 001 3d_fullres 0')
 
     #affichage des logs du container pour debuggage:
     for line in container.logs(stream=True,follow=True):
