@@ -74,7 +74,7 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
 
         LOGGER.info("Setup temporary directory")
         # create folder structure
-        root = outdir
+        root = pathlib.Path(outdir)
         (root / "nnUNet_raw").mkdir()
         (root / "nnUNet_results").mkdir()
         (root / "nnUNet_preprocessed").mkdir()
@@ -175,5 +175,6 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
 
         if build_image:
             # build inference docker
-           docker_template.make_docker(title,outdir)
+           docker_template.make_docker(model,outdir)
+           
            
