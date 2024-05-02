@@ -40,4 +40,4 @@ ENV nnUNet_results="./nnUNet_results"
 ENV nnUNet_preprocessed="./nnUNet_preprocessed"
 
 ENTRYPOINT ["bash"]
-CMD [train.sh"]
+CMD ["train.sh"]
