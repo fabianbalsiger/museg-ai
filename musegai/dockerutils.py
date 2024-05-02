@@ -17,7 +17,7 @@ def list_models(local=True):
         client= docker.from_env()
         print('images installé sur la machine:')
         for image in client.images.list():
-            if "museg" in ''.join(image.tags):
+            if "museg" in image.tags[0]:
                 print(image.tags)
     
     return [
