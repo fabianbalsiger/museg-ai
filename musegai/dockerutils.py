@@ -11,9 +11,15 @@ REPOSITORY = ...
 TRAIN_IMAGE = 'fabianbalsiger/museg-train:v1.0.0'
 
 
-def list_models():
+def list_models(local=True):
     """list existing models"""
-    # temp
+    if local:
+        client= docker.from_env()
+        print('images installé sur la machine:')
+        for image in client.images.list():
+            if "museg" in ''.join(image.tags):
+                print(image.tags)
+    
     return [
         f"fabianbalsiger/museg:thigh-model3",
     ]

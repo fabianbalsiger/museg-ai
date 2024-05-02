@@ -4,7 +4,7 @@ import logging
 import tempfile
 import numpy as np
 
-from . import io, docker
+from . import dockerutils, io
 
 LOGGER = logging.getLogger(__name__)
 
@@ -82,7 +82,7 @@ def infer(model, images, outputs=None, *, side=None, tempdir=None):
         LOGGER.info(f"Done copying data (num. datasets: {num})")
 
         # run model
-        docker.run_inference(model, root)
+        dockerutils.run_inference(model, root)
 
         # recover outputs
         rois = []

@@ -6,7 +6,7 @@ import shutil
 
 import numpy as np
 
-from . import io, docker,docker_template
+from . import dockerutils, io, docker_template
 
 LOGGER = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
         nnU-net model file
         Docker image
     """
-    if not docker.check_training():
+    if not dockerutils.check_training():
         raise RuntimeError("Training image not available")
 
     # names
@@ -160,7 +160,7 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
         # run nnU-net training
         breakpoint()
         LOGGER.info(f"Run nnU-net training")
-        docker.run_training(model, tmp)
+        dockerutils.run_training(model, tmp)
 
         # store model files
         outdir.mkdir(parents=True, exist_ok=True)

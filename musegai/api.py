@@ -1,8 +1,8 @@
 """API for muscle segmentation."""
 
-from . import train, infer, docker, io
+from . import dockerutils, train, infer, io
 
 is_image = io.is_image
-list_models = docker.list_models
+list_models = dockerutils.list_models
 run_model = infer.infer
 train_model = train.train
