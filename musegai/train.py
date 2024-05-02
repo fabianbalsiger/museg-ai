@@ -6,7 +6,7 @@ import shutil
 
 import numpy as np
 
-from . import io, docker
+from . import io, docker,docker_template
 
 LOGGER = logging.getLogger(__name__)
 
@@ -65,16 +65,16 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
 
     LOGGER.info("Start training (num. images: {nimage}, num. channels: {nchannel})")
     #with tempfile.TemporaryDirectory(dir=tempdir) as tmp:
-    tmp = pathlib.Path(tempdir or 'tmp')
-    if tmp.exists():
-        shutil.rmtree(tmp)
-    tmp.mkdir(exist_ok=True, parents=True)
+    # tmp = pathlib.Path(tempdir or 'tmp')
+    # if tmp.exists():
+    #     shutil.rmtree(tmp)
+    # tmp.mkdir(exist_ok=True, parents=True)
 
     if 1:
 
         LOGGER.info("Setup temporary directory")
         # create folder structure
-        root = pathlib.Path(tmp)
+        root = outdir
         (root / "nnUNet_raw").mkdir()
         (root / "nnUNet_results").mkdir()
         (root / "nnUNet_preprocessed").mkdir()
@@ -168,10 +168,12 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
         model_data = tmp / "nnUNet_trained_models/nnUNet/3d_fullres/Task503_MuscleThigh/"
         for file in model_data.glob("*"):
             shutil.copyfile(file, outdir / file.name)
+    
 
         # store label file
         io.save_labels(outdir / "labels.txt", labels)
 
         if build_image:
             # build inference docker
-            ...
+           docker_template.make_docker(title,outdir)
+           
