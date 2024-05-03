@@ -115,6 +115,8 @@ def train(model, images, rois, nchannel, labelfile, root, dest, split, tempdir, 
     # output dir
     if not dest:
         outdir = pathlib.Path(".") / model
+    else:
+        outdir=pathlib.Path(dest) / model
     if set(pathlib.Path(outdir).glob("*")):
         click.echo(f"Output folder `{outdir}` is not empty, exiting.")
         sys.exit(1)
