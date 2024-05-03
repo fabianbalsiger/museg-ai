@@ -3,7 +3,7 @@ import json
 import logging
 import tempfile
 import shutil
-
+import docker
 import numpy as np
 
 from . import dockerutils, io, docker_template
@@ -75,6 +75,7 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
         LOGGER.info("Setup temporary directory")
         # create folder structure
         root = pathlib.Path(outdir)
+        root.mkdir()
         (root / "nnUNet_raw").mkdir()
         (root / "nnUNet_results").mkdir()
         (root / "nnUNet_preprocessed").mkdir()
@@ -158,16 +159,15 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
             json.dump(meta, fp)
 
         # run nnU-net training
-        breakpoint()
         LOGGER.info(f"Run nnU-net training")
-        dockerutils.run_training(model, tmp)
+        dockerutils.run_training(model, outdir)
 
         # store model files
         outdir.mkdir(parents=True, exist_ok=True)
         # TO FIX
-        model_data = tmp / "nnUNet_trained_models/nnUNet/3d_fullres/Task503_MuscleThigh/"
-        for file in model_data.glob("*"):
-            shutil.copyfile(file, outdir / file.name)
+        # model_data = outdir / nnUNet_results/Dataset001/nnUNetTrainer_nnUNetPlans_3F_fullres/"
+        # for file in model_data.glob("*"):
+        #     shutil.copyfile(file, outdir / file.name)
     
 
         # store label file
@@ -175,6 +175,8 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
 
         if build_image:
             # build inference docker
-           docker_template.make_docker(model,outdir)
-           
-           
+            docker_template.make_docker(model,outdir,f=(0,))
+            dock=docker.from_env()
+            dock.images.build(path=str(outdir / 'infer_docker'),tag=model)
+            print(f'image successfuly build, named :{model}')
+    
