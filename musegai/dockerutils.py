@@ -69,7 +69,7 @@ def run_training(model, indir):
             detach=detach
         )
     run('nnUNetv2_plan_and_preprocess -d 001 -c 3d_fullres --verify_dataset_integrity', detach=False )
-    container = run('nnUNetv2_train 001 3d_fullres 0')
+    container = run('nnUNetv2_train 001 3d_fullres 0 -tr=nnUNetTrainer_1epoch')
 
     #affichage des logs du container pour debuggage:
     for line in container.logs(stream=True,follow=True):
