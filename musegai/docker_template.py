@@ -1,9 +1,35 @@
+import pathlib
 
-def make_docker(title, outdir,f=(0,1,2,3,4),d="001"):
-    checkpoints_files=""
-    for fold_nbr in f: 
-        checkpoints_files=checkpoints_files+f"COPY {outdir}/nnUNet_results/Dataset001/nnUNetTrainer_nnUNetPlans_3D_fullres/fold_{fold_nbr}/checkpoint_final.pth ./nnUNet_results/Dataset001/nnUNetTrainer_nnUNetPlans_3D_fullres/fold_{fold_nbr}/checkpoint_final.pth\n"
-    dockerfile_content = f'''FROM nvidia/cuda:11.4.3-runtime-ubuntu20.04
+
+def get_ressources():
+    """get the path to the ressources folder"""
+    here = pathlib.Path(__file__).parent
+    return here.parent / "ressources"
+
+
+def make_docker(title, outdir, f=(0, 1, 2, 3, 4), d="001"):
+    """create the dockerfile from the template below"""
+    ressources_dir = get_ressources()
+    checkpoints_files = ""
+    for fold_nbr in f:
+        checkpoints_files = (
+            checkpoints_files
+            + f"COPY {outdir}/nnUNet_results/Dataset001/nnUNetTrainer_nnUNetPlans_3D_fullres/fold_{fold_nbr}/checkpoint_final.pth ./nnUNet_results/Dataset001/nnUNetTrainer_nnUNetPlans_3D_fullres/fold_{fold_nbr}/checkpoint_final.pth\n"
+        )
+        
+    dockerfile_content = DOCKER_FILE.format(title=title, ressources_dir=ressources_dir, outdir=outdir, f=f, d=d, checkpoints_files=checkpoints_files)
+
+    # Création du dossier docker & écriture du dockerfile
+    (outdir / "infer_docker").mkdir(parents=True, exist_ok=True)
+    with open(outdir / "infer_docker" / "Dockerfile", "w") as dockerfile:
+        dockerfile.write(dockerfile_content)
+
+    print("Dockerfile successfully created!")
+    if (get_ressources() / 'requirements_train.txt').exists():
+        print('fichier trouvé')
+
+
+DOCKER_FILE = """FROM nvidia/cuda:11.4.3-runtime-ubuntu20.04
 LABEL application={title}
 LABEL author="Fabian Balsiger and Pierre-Yves Baudin"
 
@@ -31,7 +57,7 @@ update-alternatives --set python3 /usr/bin/python3.10
 RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && python get-pip.py
 
 # Copy necessary files to the working directory
-COPY ./requirements_train.txt .
+COPY {ressources_dir}/requirements_train.txt .
 
 # Copy the model to the working directory
 {checkpoints_files}
@@ -49,11 +75,4 @@ COPY {outdir}/labels.txt ./labels.txt
 
 CMD ["-i", "./data/in", "-o", "./data/out"]
 ENTRYPOINT ["nnUNetv2_predict.py","-c", "3d_fullres", "-p", "nnUNetPlansv2.1", '--save_probabilities', "-d", {d},"f", {f}]
-'''
-
-    # Création du dossier docker & écriture du dockerfile
-    (outdir / 'infer_docker').mkdir(parents=True, exist_ok=True)
-    with open(outdir / 'infer_docker' / 'Dockerfile', 'w') as dockerfile:
-        dockerfile.write(dockerfile_content)
-
-    print("Dockerfile successfully created!")
+"""
