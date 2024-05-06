@@ -178,6 +178,6 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
 
             docker_template.make_docker(model,outdir,f=(0,))
             dock=docker.from_env()
-            dock.images.build(path=str(outdir),tag=model)
+            dock.images.build(path=str(outdir),tag=model,quiet=False,rm=True)
             print(f'image successfuly build, named :{model}')
     
