@@ -167,7 +167,7 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
         # TO FIX
         # model_data = outdir / nnUNet_results/Dataset001/nnUNetTrainer_nnUNetPlans_3F_fullres/"
         # for file in model_data.glob("*"):
-        #     shutil.copyfile(file, outdir / file.name)
+        #     shutil.copyfile(file, outdir / file.name) 
     
 
         # store label file
@@ -175,8 +175,9 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
 
         if build_image:
             # build inference docker
+
             docker_template.make_docker(model,outdir,f=(0,))
             dock=docker.from_env()
-            dock.images.build(path=str(outdir / 'infer_docker'),tag=model)
+            dock.images.build(path=str(outdir),tag=model)
             print(f'image successfuly build, named :{model}')
     

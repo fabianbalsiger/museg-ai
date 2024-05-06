@@ -62,7 +62,7 @@ def run_training(model, indir):
             image,
             #"001 3d_fullres 2",
             entrypoint=cmd,
-            remove=False,
+            remove=True,
             ipc_mode='host',
             device_requests=[docker.types.DeviceRequest(device_ids=["all"], capabilities=[["gpu"]])],
             volumes={indir: {"bind": "/data", "mode": "rw"}},
