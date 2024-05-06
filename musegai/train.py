@@ -148,7 +148,7 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
         for cle,val in label_names.items():
             if val==0:
                 label_names['background']=label_names.pop(cle)
-                
+                break
     
         label_names['background']=0
 
