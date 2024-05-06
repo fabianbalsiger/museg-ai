@@ -145,6 +145,11 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
         # metadata
         channel_names = {f"{i}": f"mag{i:02d}" for i in range(nchannel)}
         label_names = dict(zip(labels.descriptions, labels.indices))
+        for cle,val in label_names.items():
+            if val==0:
+                label_names['background']=label_names.pop(cle)
+                
+    
         label_names['background']=0
 
         # store JSON metadata
