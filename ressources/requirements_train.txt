@@ -1,2 +1,2 @@
-nnunetv2==2.2.0
-torch==2.2.1
+nnunetv2==2.4.2
+torch==2.3.0
