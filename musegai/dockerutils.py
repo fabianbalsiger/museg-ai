@@ -8,7 +8,7 @@ TODO:
 
 # repository
 REPOSITORY = ...
-TRAIN_IMAGE = 'fabianbalsiger/museg-train:v1.0.0'
+TRAIN_IMAGE = 'museg-train:v1.1.0'
 
 
 def list_models(local=True):
