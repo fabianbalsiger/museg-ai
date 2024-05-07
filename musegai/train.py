@@ -60,8 +60,20 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
         raise ValueError(f"Number of channels is not constant")
 
     # check label file
+    labelremap = None
     if labels is not None:
         labels = io.load_labels(labels)
+        if split_axis is not None:
+            # remove side suffix in label descriptions
+            splits = [descr.rsplit('_', 1) for descr in labels.descriptions]
+            labels.descriptions = [
+                split[0] if split[-1].upper() in ['L', 'R'] else descr
+                for split, descr in zip(splits, labels.descriptions)
+            ]
+        # remap index values
+        uniquelabels = {name: index for index, name in zip(labels.indices[::-1], labels.descriptions[::-1])}
+        labelremap = np.array([uniquelabels[name] for name in labels.descriptions])
+
 
     LOGGER.info("Start training (num. images: {nimage}, num. channels: {nchannel})")
     #with tempfile.TemporaryDirectory(dir=tempdir) as tmp:
@@ -75,7 +87,7 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
         LOGGER.info("Setup temporary directory")
         # create folder structure
         root = pathlib.Path(outdir)
-        root.mkdir()
+        root.mkdir(parents=True)
         (root / "nnUNet_raw").mkdir()
         (root / "nnUNet_results").mkdir()
         (root / "nnUNet_preprocessed").mkdir()
@@ -92,6 +104,9 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
 
             # load labelmap
             labelmap = io.load(rois[index])
+
+            if labelremap is not None:
+                labelmap.array = labelremap[labelmap.array]            
 
             # make label values contiguous
             _labelset, array = np.unique(labelmap, return_inverse=True)
@@ -110,11 +125,12 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
                     labels = labels.subset(labelset, reindex=True)
             elif labelset != set(_labelset):
                 raise ValueError(f"Inconsistent label values in dataset {index}: {labelset} != {_labelset}")
+            
 
             if split_axis is not None:
                 # split into halves (eg. left and right sides)
-                labelsA, labelsB = labelmap.split(split_axis)
-                keepA, keepB = np.any(labelsA > 0), np.any(labelsB > 0)
+                labelsA, labelsB = io.split(labelmap, split_axis)
+                keepA, keepB = np.any(labelsA.array > 0), np.any(labelsB.array > 0)
 
                 if keepA:
                     io.save(data_dir / labeldir / roiname.format(num=num), labelsA)
@@ -141,16 +157,12 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
                 num += 1
 
         LOGGER.info(f"Done copying training data (num. training: {num})")
-
+        
         # metadata
         channel_names = {f"{i}": f"mag{i:02d}" for i in range(nchannel)}
-        label_names = dict(zip(labels.descriptions, labels.indices))
-        for cle,val in label_names.items():
-            if val==0:
-                label_names['background']=label_names.pop(cle)
-                break
-    
-        label_names['background']=0
+        # force label 0 at 'background'
+        labels.descriptions[0] = 'background'
+        label_names = {labels[i]: i for i in labels}
 
         # store JSON metadata
         meta = {

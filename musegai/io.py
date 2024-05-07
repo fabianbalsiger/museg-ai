@@ -109,7 +109,10 @@ class Image:
 
     def save(self, file, ext=None):
         file = pathlib.Path(file)
-        im = sitk.GetImageFromArray(self.array.T)
+        array = self.array.T
+        if np.issubdtype(self.array.dtype, np.integer):
+            array = array.astype(np.uint8)
+        im = sitk.GetImageFromArray(array)
         im.SetSpacing(self.spacing)
         im.SetOrigin(self.origin)
         im.SetDirection(self.transform)
@@ -148,7 +151,7 @@ class Image:
 class Labels:
     """dict-like Label container"""
 
-    RE_LABEL = re.compile(r'(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+([\.\d]+)\s+(\d)\s+(\d)\s+"([\w\s]+)"$')
+    RE_LABEL = re.compile(r'(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+([\.\d]+)\s+(\d)\s+(\d)\s+"([\w\s\-]+)"$')
 
     def __init__(self, indices, descriptions, colors=None, transparency=None, visibility=None):
         self.indices = list(map(int, indices))
@@ -181,7 +184,7 @@ class Labels:
         return iter(self.indices)
 
     def __getitem__(self, item):
-        dct = dict(*zip(self.indices, self.descriptions))
+        dct = dict(zip(self.indices, self.descriptions))
         return dct[item]
 
     def subset(self, indices, reindex=True):
