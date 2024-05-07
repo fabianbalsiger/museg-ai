@@ -177,7 +177,6 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
         # store label file
         io.save_labels(outdir / "labels.txt", labels)
 
-    breakpoint()
     if build_image:            
         LOGGER.info(f"Build docker image for model {model} (tag: {tag})")
         dockerutils.build_inference(model, tag, outdir)

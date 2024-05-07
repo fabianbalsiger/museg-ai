@@ -54,10 +54,9 @@ def check_training():
     # TODO
     return True
 
-import pathlib
+
 def run_training(model, dirname):
     """Run training"""
-    breakpoint()
     dirname = str(pathlib.Path(dirname).resolve())
     client = docker.from_env()
     image = TRAIN_IMAGE
@@ -105,7 +104,6 @@ def build_inference(model, tag, dirname):
     # get docker template
     dockerfile = docker_template.make_docker(model, dirname, folds=(0,1,2,3,4))
     # dockerfile = docker_template.make_docker(model, dirname, folds=(0,))
-    breakpoint()
 
     # get the requirement file
     ressources_dir = get_ressources()
