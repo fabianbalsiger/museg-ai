@@ -25,11 +25,11 @@ def make_docker(title, outdir, f=(0, 1, 2, 3, 4), d="001"):
     # putting f in good shape to be processed by CLI :
     str_out=''
     for nbr in f :
-        str_out=str_out+"\""+ str(k)+ "\""+","
+        str_out=str_out+"\""+ str(nbr)+ "\""+","
     f=str_out[-1]
     dockerfile_content = DOCKER_FILE.format(title=title, ressources_dir=ressources_dir, outdir=outdir, f=f, d=d, checkpoints_files=checkpoints_files)
 
-    # écriture du dockerfile
+    # dockerfile writing
     with open(outdir / "Dockerfile", "w") as dockerfile:
         dockerfile.write(dockerfile_content)
 
@@ -88,5 +88,5 @@ ENV nnUNet_preprocessed = "/nnUNet_preprocessed"
 COPY ./labels.txt ./labels.txt
 
 CMD ["-i", "/data/in", "-o", "/data/out"]
-ENTRYPOINT ["nnUNetv2_predict", "-c", "3d_fullres", "-d", \"{d}\", "-f", \"{f}\", "--save_probabilities"]
+ENTRYPOINT ["nnUNetv2_predict", "-c", "3d_fullres", "-d", \"{d}\", "-f", {f}, "--save_probabilities"]
 """
