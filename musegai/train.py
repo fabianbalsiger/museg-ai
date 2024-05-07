@@ -193,8 +193,7 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
         if build_image:
             # build inference docker
 
-            docker_template.make_docker(model,outdir,f=(0,))
+            docker_template.make_docker(model,outdir,f=(0,1,2,3,4))
             dock=docker.from_env()
-            dock.images.build(path=str(outdir),tag=model,quiet=False,rm=True)
+            dock.images.build(path=str(outdir),tag=model,quiet=False,forcerm=True,rm=True)
             print(f'image successfuly build, named :{model}')
-    

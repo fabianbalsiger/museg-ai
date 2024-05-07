@@ -30,3 +30,6 @@ dist/
 # custom
 data/
 tmp/
+
+#bug files
+infer/
