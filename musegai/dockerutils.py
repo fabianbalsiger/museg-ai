@@ -38,6 +38,7 @@ def run_inference(model, dirname):
     client.containers.run(
         image,
         remove=True,
+        ipc_mode='host',
         device_requests=[docker.types.DeviceRequest(device_ids=["all"], capabilities=[["gpu"]])],
         volumes={dirname: {"bind": "/data", "mode": "rw"}},
     )
@@ -65,7 +66,7 @@ def run_training(model, indir):
             remove=True,
             ipc_mode='host',
             device_requests=[docker.types.DeviceRequest(device_ids=["all"], capabilities=[["gpu"]])],
-            volumes={indir: {"bind": "/data", "mode": "rw"}},
+            volumes={indir: {"bind": "/nnunet", "mode": "rw"}},
             detach=detach
         )
     run('nnUNetv2_plan_and_preprocess -d 001 -c 3d_fullres --verify_dataset_integrity', detach=False )

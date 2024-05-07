@@ -12,7 +12,7 @@ WORKDIR /
 RUN apt update --yes --quiet && apt install --yes --quiet --no-install-recommends software-properties-common
 RUN add-apt-repository ppa:deadsnakes/ppa
 RUN apt update --yes --quiet && DEBIAN_FRONTEND=noninteractive apt install --yes --quiet --no-install-recommends \
-    python3.10 python3.10-distutils build-essential curl \
+    python3.10 libpython3.10-dev python3.10-distutils build-essential curl \
  && rm -rf /var/lib/apt/lists/*
 
 # Switch default Python version to 3.10
@@ -27,17 +27,16 @@ RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.8 1 &&
 RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && python get-pip.py
 
 # Copy necessary files to the working directory
-COPY ./requirements_train.txt .
+COPY ./requirements.txt .
 COPY ./train.sh .
 
 # Install requirements
-RUN pip install --no-cache-dir -r requirements_train.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy custom trainer and set nnU-Net environment variable
-COPY ./nnUNetTrainerV2_MUSEGAI.py /usr/local/lib/python3.10/dist-packages/nnunetv2/training/nnUNetTrainer/nnUNetTrainerV2_MUSEGAI.py
-ENV nnUNet_raw="./nnUNet_raw"
-ENV nnUNet_results="./nnUNet_results"
-ENV nnUNet_preprocessed="./nnUNet_preprocessed"
+ENV nnUNet_raw="/nnunet/nnUNet_raw"
+ENV nnUNet_results="/nnunet/nnUNet_results"
+ENV nnUNet_preprocessed="/nnunet/nnUNet_preprocessed"
 
 ENTRYPOINT ["bash"]
 CMD ["train.sh"]
