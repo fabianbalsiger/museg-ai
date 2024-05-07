@@ -30,7 +30,7 @@ def make_docker(title, outdir, f=(0, 1, 2, 3, 4), d="001"):
         dockerfile.write(dockerfile_content)
 
     print("Dockerfile successfully created!")
-    if (get_ressources() / 'requirements_train.txt').exists():
+    if (get_ressources() / 'requirements.txt').exists():
         print('fichier requirement trouvé')
 
 
