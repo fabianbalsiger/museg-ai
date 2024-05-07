@@ -4,8 +4,7 @@ import shutil
 def get_ressources():
     """get the path to the ressources folder"""
     here = pathlib.Path(__file__).parent
-    return here.parent / "ressources"
-
+    return here.parent / "docker" /"training"
 
 def make_docker(title, outdir, f=(0, 1, 2, 3, 4), d="001"):
     """create the dockerfile from the template below"""
@@ -77,11 +76,11 @@ COPY ./nnUNet_results/Dataset001/nnUNetTrainer_1epoch__nnUNetPlans__3d_fullres/p
 # Install requirements
 RUN pip install --no-cache-dir -r requirements_train.txt
 
-# Copy custom trainer and set nnU-Net environment variable
+# Set nnU-Net environment variable
 ENV nnUNet_results="./nnUNet_results"
 
 COPY ./labels.txt ./labels.txt
 
 CMD ["-i", "./data/in", "-o", "./data/out"]
-ENTRYPOINT ["nnUNetv2_predict", "-c", "3d_fullres", "--save_probabilities", "-d", {d}, "-f", {f}]
+ENTRYPOINT ["nnUNetv2_predict", "-c", "3d_fullres", "-d", \"{d}\", "-f", \"{f}\", "--save_probabilities"]
 """
