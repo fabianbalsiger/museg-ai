@@ -1,4 +1,7 @@
+import pathlib
+import shutil
 import docker
+from . import docker_template
 
 """
 TODO:
@@ -29,6 +32,8 @@ def list_models(local=True):
     # return names
 
 
+
+
 def run_inference(model, dirname):
     """Run inference"""
     client = docker.from_env()
@@ -50,50 +55,73 @@ def check_training():
     return True
 
 import pathlib
-def run_training(model, indir):
+def run_training(model, dirname):
     """Run training"""
-    # TODO
-    indir = pathlib.Path(indir).resolve()
+    breakpoint()
+    dirname = str(pathlib.Path(dirname).resolve())
     client = docker.from_env()
     image = TRAIN_IMAGE
     _pull_image(image)
+    
     print(f"Training model '{model}'")
-    def run(cmd, detach=True):
-        return client.containers.run(
+    def run(entrypoint, cmd):
+        container = client.containers.run(
             image,
-            #"001 3d_fullres 2",
-            entrypoint=cmd,
+            cmd,
+            entrypoint=entrypoint,
             remove=True,
+            detach=True,
             ipc_mode='host',
             device_requests=[docker.types.DeviceRequest(device_ids=["all"], capabilities=[["gpu"]])],
-            volumes={indir: {"bind": "/nnunet", "mode": "rw"}},
-            detach=detach
+            volumes={dirname: {"bind": "/nnunet", "mode": "rw"}},
         )
-    run('nnUNetv2_plan_and_preprocess -d 001 -c 3d_fullres --verify_dataset_integrity', detach=False )
-    container = run('nnUNetv2_train 001 3d_fullres 0 -tr=nnUNetTrainer_1epoch')
-     #affichage des logs du container pour debuggage:
-    for line in container.logs(stream=True,follow=True):
-        print(line.decode('utf-8').strip())
-    container = run('nnUNetv2_train 001 3d_fullres 1 -tr=nnUNetTrainer_1epoch')
-     #affichage des logs du container pour debuggage:
-    for line in container.logs(stream=True,follow=True):
-        print(line.decode('utf-8').strip())
-    container = run('nnUNetv2_train 001 3d_fullres 2 -tr=nnUNetTrainer_1epoch')
-     #affichage des logs du container pour debuggage:
-    for line in container.logs(stream=True,follow=True):
-        print(line.decode('utf-8').strip())
-    container = run('nnUNetv2_train 001 3d_fullres 3 -tr=nnUNetTrainer_1epoch')
-     #affichage des logs du container pour debuggage:
-    for line in container.logs(stream=True,follow=True):
-        print(line.decode('utf-8').strip())
-    container = run('nnUNetv2_train 001 3d_fullres 4 -tr=nnUNetTrainer_1epoch')
- #affichage des logs du container pour debuggage:
-    for line in container.logs(stream=True,follow=True):
-        print(line.decode('utf-8').strip())
+        # print logs
+        for line in container.logs(stream=True, follow=True):
+            print(line.decode('utf-8').strip())
+        return container.status
 
-    #affichage des logs du container pour debuggage:
-    for line in container.logs(stream=True,follow=True):
-        print(line.decode('utf-8').strip())
+    # preprocess
+    status = run('nnUNetv2_plan_and_preprocess', ['-d', '001', '-c', '3d_fullres', '--verify_dataset_integrity'])
+
+    # train
+    status = run('nnUNetv2_train', ['001', '3d_fullres', '0', ]) #'-tr', 'nnUNetTrainer_1epoch'])
+    status = run('nnUNetv2_train', ['001', '3d_fullres', '1', ]) #'-tr', 'nnUNetTrainer_1epoch'])
+    status = run('nnUNetv2_train', ['001', '3d_fullres', '2', ]) #'-tr', 'nnUNetTrainer_1epoch'])
+    status = run('nnUNetv2_train', ['001', '3d_fullres', '3', ]) #'-tr', 'nnUNetTrainer_1epoch'])
+    status = run('nnUNetv2_train', ['001', '3d_fullres', '4', ]) #'-tr', 'nnUNetTrainer_1epoch'])
+
+
+
+def get_ressources():
+    """get the path to the ressources folder"""
+    here = pathlib.Path(__file__).parent
+    return here.parent / "docker" /"training"
+
+
+def build_inference(model, tag, dirname):
+    """ build inference docker """
+    client = docker.from_env()
+
+    # get docker template
+    dockerfile = docker_template.make_docker(model, dirname, folds=(0,1,2,3,4))
+    # dockerfile = docker_template.make_docker(model, dirname, folds=(0,))
+    breakpoint()
+
+    # get the requirement file
+    ressources_dir = get_ressources()
+    shutil.copy((ressources_dir/ "requirements.txt"), dirname)
+
+    # dockerfile writing
+    with open(dirname / "Dockerfile", "w") as fp:
+        fp.write(dockerfile)
+
+    # build image
+    image, logs = client.images.build(path=str(dirname), tag=tag, quiet=False, forcerm=True, rm=True)
+    for chunk in logs:
+        if not 'stream' in chunk:
+            continue
+        for line in chunk['stream'].splitlines():
+            print(line)
 
 
 

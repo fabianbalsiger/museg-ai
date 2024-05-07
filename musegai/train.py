@@ -6,7 +6,7 @@ import shutil
 import docker
 import numpy as np
 
-from . import dockerutils, io, docker_template
+from . import dockerutils, io
 
 LOGGER = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ LOGGER = logging.getLogger(__name__)
 """
 
 
-def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None, build_image=True, tempdir=None):
+def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None, train_model=True, build_image=True):
     """train new model on provided datasets
 
     Args
@@ -46,8 +46,6 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
 
     # output model directory
     outdir = pathlib.Path(outdir)
-    if outdir.exists():
-        raise FileExistsError(outdir)
 
     nimage = len(images)
     if nimage != len(rois):
@@ -75,16 +73,9 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
         labelremap = np.array([uniquelabels[name] for name in labels.descriptions])
 
 
-    LOGGER.info("Start training (num. images: {nimage}, num. channels: {nchannel})")
-    #with tempfile.TemporaryDirectory(dir=tempdir) as tmp:
-    # tmp = pathlib.Path(tempdir or 'tmp')
-    # if tmp.exists():
-    #     shutil.rmtree(tmp)
-    # tmp.mkdir(exist_ok=True, parents=True)
+    if train_model:
+        LOGGER.info("Start training (num. images: {nimage}, num. channels: {nchannel})")
 
-    if 1:
-
-        LOGGER.info("Setup temporary directory")
         # create folder structure
         root = pathlib.Path(outdir)
         root.mkdir(parents=True)
@@ -150,10 +141,10 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
 
             else:
                 # do not split
-                io.save(data_dir / labeldir / roiname.format(num=num, side="X"), labelmap)
+                io.save(data_dir / labeldir / roiname.format(num=num), labelmap)
                 for channel in range(nchannel):
                     image = io.load(images[index][channel])
-                    io.save(data_dir / imagedir / imagename.format(num=num, side="X", channel=channel), image)
+                    io.save(data_dir / imagedir / imagename.format(num=num, channel=channel), image)
                 num += 1
 
         LOGGER.info(f"Done copying training data (num. training: {num})")
@@ -177,23 +168,16 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
 
         # run nnU-net training
         LOGGER.info(f"Run nnU-net training")
+        
         dockerutils.run_training(model, outdir)
 
         # store model files
         outdir.mkdir(parents=True, exist_ok=True)
-        # TO FIX
-        # model_data = outdir / nnUNet_results/Dataset001/nnUNetTrainer_nnUNetPlans_3F_fullres/"
-        # for file in model_data.glob("*"):
-        #     shutil.copyfile(file, outdir / file.name) 
-    
 
         # store label file
         io.save_labels(outdir / "labels.txt", labels)
 
-        if build_image:
-            # build inference docker
-
-            docker_template.make_docker(model,outdir,f=(0,1,2,3,4))
-            dock=docker.from_env()
-            dock.images.build(path=str(outdir),tag=model,quiet=False,forcerm=True,rm=True)
-            print(f'image successfuly build, named :{model}')
+    breakpoint()
+    if build_image:            
+        LOGGER.info(f"Build docker image for model {model} (tag: {tag})")
+        dockerutils.build_inference(model, tag, outdir)

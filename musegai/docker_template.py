@@ -1,42 +1,33 @@
-import pathlib
-import shutil
 
-def get_ressources():
-    """get the path to the ressources folder"""
-    here = pathlib.Path(__file__).parent
-    return here.parent / "docker" /"training"
 
-def make_docker(title, outdir, f=(0, 1, 2, 3, 4), d="001"):
+def make_docker(title, outdir, folds=(0, 1, 2, 3, 4), trainer='nnUNetTrainer', dataset="001", config='3d_fullres'):
     """create the dockerfile from the template below"""
-    ressources_dir = get_ressources()
-    # get the requirement file
-    shutil.copy((ressources_dir/ "requirements.txt"),outdir)
+    
+    # putting folds in good shape to be processed by CLI :
+    foldstr = ', '.join(f'"{f}"' for f in folds)
+
     # dealing with folder link with the fold number in crossvalidation
     checkpoints_files = ""
-    for fold_nbr in f:
-        # checkpoints_files = (
-        #     checkpoints_files
-        #     + f"COPY ./nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__3d_fullres/fold_{fold_nbr}/checkpoint_final.pth /nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__3d_fullres/fold_{fold_nbr}/checkpoint_final.pth\n"
-        # )
+    for fold_nbr in folds:
         checkpoints_files = (
             checkpoints_files
-            + f"COPY ./nnUNet_results/Dataset001/nnUNetTrainer_1epoch__nnUNetPlans__3d_fullres/fold_{fold_nbr}/checkpoint_final.pth /nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__3d_fullres/fold_{fold_nbr}/checkpoint_final.pth\n"
+            + f"COPY ./nnUNet_results/Dataset001/{trainer}__nnUNetPlans__{config}/fold_{fold_nbr}/checkpoint_final.pth"
+            + f" /nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__{config}/fold_{fold_nbr}/checkpoint_final.pth\n"
         )
-    # putting f in good shape to be processed by CLI :
-    str_out=''
-    for nbr in f :
-        str_out=str_out+"\""+ str(nbr)+ "\""+","
-    f=str_out[-1]
-    dockerfile_content = DOCKER_FILE.format(title=title, ressources_dir=ressources_dir, outdir=outdir, f=f, d=d, checkpoints_files=checkpoints_files)
+    
+    dockerfile = DOCKER_FILE.format(
+        title=title,
+        trainer=trainer,
+        checkpoints_files=checkpoints_files,
+        folds=foldstr, 
+        dataset=dataset, 
+        config=config,
+    )
+    return dockerfile
 
-    # dockerfile writing
-    with open(outdir / "Dockerfile", "w") as dockerfile:
-        dockerfile.write(dockerfile_content)
 
-    print("Dockerfile successfully created!")
-    if (get_ressources() / 'requirements.txt').exists():
-        print('fichier requirement trouvé')
-
+#
+# dockerfile template 
 
 DOCKER_FILE = """FROM nvidia/cuda:11.4.3-runtime-ubuntu20.04
 LABEL application={title}
@@ -70,12 +61,9 @@ COPY ./requirements.txt .
 
 # Copy the model to the working directory
 {checkpoints_files}
-COPY ./nnUNet_results/Dataset001/nnUNetTrainer_1epoch__nnUNetPlans__3d_fullres/dataset.json /nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__3d_fullres/dataset.json
-COPY ./nnUNet_results/Dataset001/nnUNetTrainer_1epoch__nnUNetPlans__3d_fullres/dataset_fingerprint.json /nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__3d_fullres/dataset_fingerprint.json
-COPY ./nnUNet_results/Dataset001/nnUNetTrainer_1epoch__nnUNetPlans__3d_fullres/plans.json /nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__3d_fullres/plans.json
-# COPY ./nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__3d_fullres/dataset.json /nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__3d_fullres/dataset.json
-# COPY ./nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__3d_fullres/dataset_fingerprint.json /nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__3d_fullres/dataset_fingerprint.json
-# COPY ./nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__3d_fullres/plans.json /nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__3d_fullres/plans.json
+COPY ./nnUNet_results/Dataset001/{trainer}__nnUNetPlans__{config}/dataset.json /nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__{config}/dataset.json
+COPY ./nnUNet_results/Dataset001/{trainer}__nnUNetPlans__{config}/dataset_fingerprint.json /nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__{config}/dataset_fingerprint.json
+COPY ./nnUNet_results/Dataset001/{trainer}__nnUNetPlans__{config}/plans.json /nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__{config}/plans.json
 
 # Install requirements
 RUN pip install --no-cache-dir -r requirements.txt
@@ -87,6 +75,6 @@ ENV nnUNet_preprocessed = "/nnUNet_preprocessed"
 
 COPY ./labels.txt ./labels.txt
 
+ENTRYPOINT ["nnUNetv2_predict", "-c", "{config}", "-d", "{dataset}", "-f", {folds}, "--save_probabilities"]
 CMD ["-i", "/data/in", "-o", "/data/out"]
-ENTRYPOINT ["nnUNetv2_predict", "-c", "3d_fullres", "-d", \"{d}\", "-f", {f}, "--save_probabilities"]
 """

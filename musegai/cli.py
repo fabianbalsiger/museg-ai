@@ -103,21 +103,27 @@ def infer(images, dest, format, model, side, tempdir, verbose):
 @click.argument("model")
 @click.argument("images")
 @click.argument("rois")
+@click.option('--train/--no-train', default=True, help='Train model.')
+@click.option('--build/--no-build', default=True, help='Build model image.')
+@click.option("-r", "--root", type=click.Path(exists=True), help="Root directory for training data.")
+@click.option("-o", "--outdir", type=click.Path(), help="Output directory for model files.")
 @click.option("--labelfile", type=click.Path(exists=True), help="ITK-Snap label file")
-@click.option("--nchannel", type=int, default=2, help='Expected number of channels')
-@click.option("-r", "--root", type=click.Path(exists=True), help="root directory.")
-@click.option("-d", "--dest", type=click.Path(), help="Output directory.")
+@click.option("--nchannel", type=int, default=1, help='Expected number of channels')
 @click.option("--split", is_flag=True, help="Split datasets into left and right parts")
-@click.option("-v", "--verbose", is_flag=True, help="Show more information")
-@click.option("--tempdir", type=click.Path(exists=True), help="Location for temporary files.")
-def train(model, images, rois, nchannel, labelfile, root, dest, split, tempdir, verbose):
+@click.option('--tag', help='docker image tag')
+@click.option('-v', '--verbose', is_flag=True, help='docker image tag')
+def train(model, images, rois, train, build, nchannel, labelfile, root, outdir, split, tag, verbose):
     """Create new segmentation model using training images and rois"""
+    if verbose:
+        logging.basicConfig(level=logging.INFO)
+            
     # output dir
-    if not dest:
+    if not outdir:
         outdir = pathlib.Path(".") / model
     else:
-        outdir=pathlib.Path(dest) / model
-    if set(pathlib.Path(outdir).glob("*")):
+        outdir = pathlib.Path(outdir)
+
+    if set(pathlib.Path(outdir).glob("*")) and train:
         click.echo(f"Output folder `{outdir}` is not empty, exiting.")
         sys.exit(1)
 
@@ -164,7 +170,7 @@ def train(model, images, rois, nchannel, labelfile, root, dest, split, tempdir, 
     # check num channels
     channels = {len(ims) for ims in images}
     if not channels == {nchannel}:
-        click.echo(f"Error: invalid number of channels (must be 2)")
+        click.echo(f"Error: invalid number of channels (must be {nchannel})")
         for ims in images:
             click.echo(f'\t{", ".join(map(str, ims))}')
         sys.exit(0)
@@ -180,7 +186,7 @@ def train(model, images, rois, nchannel, labelfile, root, dest, split, tempdir, 
 
     # train model
     split_axis = None if not split else 0
-    api.train_model(model, images, rois, outdir, labels=labelfile, split_axis=split_axis, build_image=True, tempdir=tempdir)
+    api.train_model(model, images, rois, outdir, labels=labelfile, split_axis=split_axis, train_model=train, build_image=build, tag=tag)
 
 
 if __name__ == "__main__":
