@@ -16,11 +16,11 @@ def make_docker(title, outdir, f=(0, 1, 2, 3, 4), d="001"):
     for fold_nbr in f:
         # checkpoints_files = (
         #     checkpoints_files
-        #     + f"COPY ./nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__3d_fullres/fold_{fold_nbr}/checkpoint_final.pth ./nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__3d_fullres/fold_{fold_nbr}/checkpoint_final.pth\n"
+        #     + f"COPY ./nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__3d_fullres/fold_{fold_nbr}/checkpoint_final.pth /nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__3d_fullres/fold_{fold_nbr}/checkpoint_final.pth\n"
         # )
         checkpoints_files = (
             checkpoints_files
-            + f"COPY ./nnUNet_results/Dataset001/nnUNetTrainer_1epoch__nnUNetPlans__3d_fullres/fold_{fold_nbr}/checkpoint_final.pth ./nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__3d_fullres/fold_{fold_nbr}/checkpoint_final.pth\n"
+            + f"COPY ./nnUNet_results/Dataset001/nnUNetTrainer_1epoch__nnUNetPlans__3d_fullres/fold_{fold_nbr}/checkpoint_final.pth /nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__3d_fullres/fold_{fold_nbr}/checkpoint_final.pth\n"
         )
     f=' '.join(map(str,f)) #formatting for the dockers entrypoints
     dockerfile_content = DOCKER_FILE.format(title=title, ressources_dir=ressources_dir, outdir=outdir, f=f, d=d, checkpoints_files=checkpoints_files)
@@ -66,18 +66,18 @@ COPY ./requirements_train.txt .
 
 # Copy the model to the working directory
 {checkpoints_files}
-COPY ./nnUNet_results/Dataset001/nnUNetTrainer_1epoch__nnUNetPlans__3d_fullres/dataset.json ./nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__3d_fullres/dataset.json
-COPY ./nnUNet_results/Dataset001/nnUNetTrainer_1epoch__nnUNetPlans__3d_fullres/dataset_fingerprint.json ./nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__3d_fullres/dataset_fingerprint.json
-COPY ./nnUNet_results/Dataset001/nnUNetTrainer_1epoch__nnUNetPlans__3d_fullres/plans.json ./nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__3d_fullres/plans.json
-# COPY ./nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__3d_fullres/dataset.json ./nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__3d_fullres/dataset.json
-# COPY ./nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__3d_fullres/dataset_fingerprint.json ./nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__3d_fullres/dataset_fingerprint.json
-# COPY ./nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__3d_fullres/plans.json ./nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__3d_fullres/plans.json
+COPY ./nnUNet_results/Dataset001/nnUNetTrainer_1epoch__nnUNetPlans__3d_fullres/dataset.json /nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__3d_fullres/dataset.json
+COPY ./nnUNet_results/Dataset001/nnUNetTrainer_1epoch__nnUNetPlans__3d_fullres/dataset_fingerprint.json /nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__3d_fullres/dataset_fingerprint.json
+COPY ./nnUNet_results/Dataset001/nnUNetTrainer_1epoch__nnUNetPlans__3d_fullres/plans.json /nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__3d_fullres/plans.json
+# COPY ./nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__3d_fullres/dataset.json /nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__3d_fullres/dataset.json
+# COPY ./nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__3d_fullres/dataset_fingerprint.json /nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__3d_fullres/dataset_fingerprint.json
+# COPY ./nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__3d_fullres/plans.json /nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__3d_fullres/plans.json
 
 # Install requirements
 RUN pip install --no-cache-dir -r requirements_train.txt
 
 # Set nnU-Net environment variable
-ENV nnUNet_results="./nnUNet_results"
+ENV nnUNet_results="/nnUNet_results"
 
 COPY ./labels.txt ./labels.txt
 
