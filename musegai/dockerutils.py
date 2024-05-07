@@ -11,18 +11,18 @@ TODO:
 
 # repository
 REPOSITORY = ...
-TRAIN_IMAGE = 'museg-train:v1.1.0'
+TRAIN_IMAGE = "museg-train:v1.1.0"
 
 
 def list_models(local=True):
     """list existing models"""
     if local:
-        client= docker.from_env()
-        print('images installé sur la machine:')
+        client = docker.from_env()
+        print("images installé sur la machine:")
         for image in client.images.list():
             if "museg" in image.tags[0]:
                 print(image.tags)
-    
+
     return [
         f"fabianbalsiger/museg:thigh-model3",
     ]
@@ -30,8 +30,6 @@ def list_models(local=True):
     # images = client.images.search(REPOSITORY)
     # names = [im['name'] for im in images]
     # return names
-
-
 
 
 def run_inference(model, dirname):
@@ -43,7 +41,7 @@ def run_inference(model, dirname):
     client.containers.run(
         image,
         remove=True,
-        ipc_mode='host',
+        ipc_mode="host",
         device_requests=[docker.types.DeviceRequest(device_ids=["all"], capabilities=[["gpu"]])],
         volumes={dirname: {"bind": "/data", "mode": "rw"}},
     )
@@ -61,8 +59,9 @@ def run_training(model, dirname):
     client = docker.from_env()
     image = TRAIN_IMAGE
     _pull_image(image)
-    
+
     print(f"Training model '{model}'")
+
     def run(entrypoint, cmd):
         container = client.containers.run(
             image,
@@ -70,44 +69,78 @@ def run_training(model, dirname):
             entrypoint=entrypoint,
             remove=True,
             detach=True,
-            ipc_mode='host',
+            ipc_mode="host",
             device_requests=[docker.types.DeviceRequest(device_ids=["all"], capabilities=[["gpu"]])],
             volumes={dirname: {"bind": "/nnunet", "mode": "rw"}},
         )
         # print logs
         for line in container.logs(stream=True, follow=True):
-            print(line.decode('utf-8').strip())
+            print(line.decode("utf-8").strip())
         return container.status
 
     # preprocess
-    status = run('nnUNetv2_plan_and_preprocess', ['-d', '001', '-c', '3d_fullres', '--verify_dataset_integrity'])
+    status = run("nnUNetv2_plan_and_preprocess", ["-d", "001", "-c", "3d_fullres", "--verify_dataset_integrity"])
 
     # train
-    status = run('nnUNetv2_train', ['001', '3d_fullres', '0', ]) #'-tr', 'nnUNetTrainer_1epoch'])
-    status = run('nnUNetv2_train', ['001', '3d_fullres', '1', ]) #'-tr', 'nnUNetTrainer_1epoch'])
-    status = run('nnUNetv2_train', ['001', '3d_fullres', '2', ]) #'-tr', 'nnUNetTrainer_1epoch'])
-    status = run('nnUNetv2_train', ['001', '3d_fullres', '3', ]) #'-tr', 'nnUNetTrainer_1epoch'])
-    status = run('nnUNetv2_train', ['001', '3d_fullres', '4', ]) #'-tr', 'nnUNetTrainer_1epoch'])
-
+    status = run(
+        "nnUNetv2_train",
+        [
+            "001",
+            "3d_fullres",
+            "0",
+        ],
+    )  #'-tr', 'nnUNetTrainer_1epoch'])
+    status = run(
+        "nnUNetv2_train",
+        [
+            "001",
+            "3d_fullres",
+            "1",
+        ],
+    )  #'-tr', 'nnUNetTrainer_1epoch'])
+    status = run(
+        "nnUNetv2_train",
+        [
+            "001",
+            "3d_fullres",
+            "2",
+        ],
+    )  #'-tr', 'nnUNetTrainer_1epoch'])
+    status = run(
+        "nnUNetv2_train",
+        [
+            "001",
+            "3d_fullres",
+            "3",
+        ],
+    )  #'-tr', 'nnUNetTrainer_1epoch'])
+    status = run(
+        "nnUNetv2_train",
+        [
+            "001",
+            "3d_fullres",
+            "4",
+        ],
+    )  #'-tr', 'nnUNetTrainer_1epoch'])
 
 
 def get_ressources():
     """get the path to the ressources folder"""
     here = pathlib.Path(__file__).parent
-    return here.parent / "docker" /"training"
+    return here.parent / "docker" / "training"
 
 
 def build_inference(model, tag, dirname):
-    """ build inference docker """
+    """build inference docker"""
     client = docker.from_env()
 
     # get docker template
-    dockerfile = docker_template.make_docker(model, dirname, folds=(0,1,2,3,4))
+    dockerfile = docker_template.make_docker(model, dirname, folds=(0, 1, 2, 3, 4))
     # dockerfile = docker_template.make_docker(model, dirname, folds=(0,))
 
     # get the requirement file
     ressources_dir = get_ressources()
-    shutil.copy((ressources_dir/ "requirements.txt"), dirname)
+    shutil.copy((ressources_dir / "requirements.txt"), dirname)
 
     # dockerfile writing
     with open(dirname / "Dockerfile", "w") as fp:
@@ -116,11 +149,10 @@ def build_inference(model, tag, dirname):
     # build image
     image, logs = client.images.build(path=str(dirname), tag=tag, quiet=False, forcerm=True, rm=True)
     for chunk in logs:
-        if not 'stream' in chunk:
+        if not "stream" in chunk:
             continue
-        for line in chunk['stream'].splitlines():
+        for line in chunk["stream"].splitlines():
             print(line)
-
 
 
 # private

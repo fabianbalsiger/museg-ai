@@ -1,10 +1,8 @@
-
-
-def make_docker(title, outdir, folds=(0, 1, 2, 3, 4), trainer='nnUNetTrainer', dataset="001", config='3d_fullres'):
+def make_docker(title, outdir, folds=(0, 1, 2, 3, 4), trainer="nnUNetTrainer", dataset="001", config="3d_fullres"):
     """create the dockerfile from the template below"""
-    
+
     # putting folds in good shape to be processed by CLI :
-    foldstr = ', '.join(f'"{f}"' for f in folds)
+    foldstr = ", ".join(f'"{f}"' for f in folds)
 
     # dealing with folder link with the fold number in crossvalidation
     checkpoints_files = ""
@@ -14,20 +12,20 @@ def make_docker(title, outdir, folds=(0, 1, 2, 3, 4), trainer='nnUNetTrainer', d
             + f"COPY ./nnUNet_results/Dataset001/{trainer}__nnUNetPlans__{config}/fold_{fold_nbr}/checkpoint_final.pth"
             + f" /nnUNet_results/Dataset001/nnUNetTrainer__nnUNetPlans__{config}/fold_{fold_nbr}/checkpoint_final.pth\n"
         )
-    
+
     dockerfile = DOCKER_FILE.format(
         title=title,
         trainer=trainer,
         checkpoints_files=checkpoints_files,
-        folds=foldstr, 
-        dataset=dataset, 
+        folds=foldstr,
+        dataset=dataset,
         config=config,
     )
     return dockerfile
 
 
 #
-# dockerfile template 
+# dockerfile template
 
 DOCKER_FILE = """FROM nvidia/cuda:11.4.3-runtime-ubuntu20.04
 LABEL application={title}

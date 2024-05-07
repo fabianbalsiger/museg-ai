@@ -103,20 +103,20 @@ def infer(images, dest, format, model, side, tempdir, verbose):
 @click.argument("model")
 @click.argument("images")
 @click.argument("rois")
-@click.option('--train/--no-train', default=True, help='Train model.')
-@click.option('--build/--no-build', default=True, help='Build model image.')
+@click.option("--train/--no-train", default=True, help="Train model.")
+@click.option("--build/--no-build", default=True, help="Build model image.")
 @click.option("-r", "--root", type=click.Path(exists=True), help="Root directory for training data.")
 @click.option("-o", "--outdir", type=click.Path(), help="Output directory for model files.")
 @click.option("--labelfile", type=click.Path(exists=True), help="ITK-Snap label file")
-@click.option("--nchannel", type=int, default=1, help='Expected number of channels')
+@click.option("--nchannel", type=int, default=1, help="Expected number of channels")
 @click.option("--split", is_flag=True, help="Split datasets into left and right parts")
-@click.option('--tag', help='docker image tag')
-@click.option('-v', '--verbose', is_flag=True, help='docker image tag')
+@click.option("--tag", help="docker image tag")
+@click.option("-v", "--verbose", is_flag=True, help="docker image tag")
 def train(model, images, rois, train, build, nchannel, labelfile, root, outdir, split, tag, verbose):
     """Create new segmentation model using training images and rois"""
     if verbose:
         logging.basicConfig(level=logging.INFO)
-            
+
     # output dir
     if not outdir:
         outdir = pathlib.Path(".") / model

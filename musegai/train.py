@@ -63,15 +63,11 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
         labels = io.load_labels(labels)
         if split_axis is not None:
             # remove side suffix in label descriptions
-            splits = [descr.rsplit('_', 1) for descr in labels.descriptions]
-            labels.descriptions = [
-                split[0] if split[-1].upper() in ['L', 'R'] else descr
-                for split, descr in zip(splits, labels.descriptions)
-            ]
+            splits = [descr.rsplit("_", 1) for descr in labels.descriptions]
+            labels.descriptions = [split[0] if split[-1].upper() in ["L", "R"] else descr for split, descr in zip(splits, labels.descriptions)]
         # remap index values
         uniquelabels = {name: index for index, name in zip(labels.indices[::-1], labels.descriptions[::-1])}
         labelremap = np.array([uniquelabels[name] for name in labels.descriptions])
-
 
     if train_model:
         LOGGER.info("Start training (num. images: {nimage}, num. channels: {nchannel})")
@@ -82,7 +78,7 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
         (root / "nnUNet_raw").mkdir()
         (root / "nnUNet_results").mkdir()
         (root / "nnUNet_preprocessed").mkdir()
-        data_dir=root/"nnUNet_raw/Dataset001"
+        data_dir = root / "nnUNet_raw/Dataset001"
         data_dir.mkdir()
         (data_dir / imagedir).mkdir()
         (data_dir / labeldir).mkdir()
@@ -97,7 +93,7 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
             labelmap = io.load(rois[index])
 
             if labelremap is not None:
-                labelmap.array = labelremap[labelmap.array]            
+                labelmap.array = labelremap[labelmap.array]
 
             # make label values contiguous
             _labelset, array = np.unique(labelmap, return_inverse=True)
@@ -116,7 +112,6 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
                     labels = labels.subset(labelset, reindex=True)
             elif labelset != set(_labelset):
                 raise ValueError(f"Inconsistent label values in dataset {index}: {labelset} != {_labelset}")
-            
 
             if split_axis is not None:
                 # split into halves (eg. left and right sides)
@@ -148,11 +143,11 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
                 num += 1
 
         LOGGER.info(f"Done copying training data (num. training: {num})")
-        
+
         # metadata
         channel_names = {f"{i}": f"mag{i:02d}" for i in range(nchannel)}
         # force label 0 at 'background'
-        labels.descriptions[0] = 'background'
+        labels.descriptions[0] = "background"
         label_names = {labels[i]: i for i in labels}
 
         # store JSON metadata
@@ -163,12 +158,12 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
             "file_ending": ".nii.gz",
             "overwrite_image_reader_writer": "SimpleITKIO",
         }
-        with open(data_dir/ "dataset.json", "w+") as fp:
+        with open(data_dir / "dataset.json", "w+") as fp:
             json.dump(meta, fp)
 
         # run nnU-net training
         LOGGER.info(f"Run nnU-net training")
-        
+
         dockerutils.run_training(model, outdir)
 
         # store model files
@@ -177,6 +172,6 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
         # store label file
         io.save_labels(outdir / "labels.txt", labels)
 
-    if build_image:            
+    if build_image:
         LOGGER.info(f"Build docker image for model {model} (tag: {tag})")
         dockerutils.build_inference(model, tag, outdir)
