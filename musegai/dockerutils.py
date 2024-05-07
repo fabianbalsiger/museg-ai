@@ -82,46 +82,11 @@ def run_training(model, dirname):
     status = run("nnUNetv2_plan_and_preprocess", ["-d", "001", "-c", "3d_fullres", "--verify_dataset_integrity"])
 
     # train
-    status = run(
-        "nnUNetv2_train",
-        [
-            "001",
-            "3d_fullres",
-            "0",
-        ],
-    )  #'-tr', 'nnUNetTrainer_1epoch'])
-    status = run(
-        "nnUNetv2_train",
-        [
-            "001",
-            "3d_fullres",
-            "1",
-        ],
-    )  #'-tr', 'nnUNetTrainer_1epoch'])
-    status = run(
-        "nnUNetv2_train",
-        [
-            "001",
-            "3d_fullres",
-            "2",
-        ],
-    )  #'-tr', 'nnUNetTrainer_1epoch'])
-    status = run(
-        "nnUNetv2_train",
-        [
-            "001",
-            "3d_fullres",
-            "3",
-        ],
-    )  #'-tr', 'nnUNetTrainer_1epoch'])
-    status = run(
-        "nnUNetv2_train",
-        [
-            "001",
-            "3d_fullres",
-            "4",
-        ],
-    )  #'-tr', 'nnUNetTrainer_1epoch'])
+    status = run("nnUNetv2_train", ["001", "3d_fullres", "0"])
+    status = run("nnUNetv2_train", ["001", "3d_fullres", "1"])
+    status = run("nnUNetv2_train", ["001", "3d_fullres", "2"])
+    status = run("nnUNetv2_train", ["001", "3d_fullres", "3"])
+    status = run("nnUNetv2_train", ["001", "3d_fullres", "4"])
 
 
 def get_ressources():
