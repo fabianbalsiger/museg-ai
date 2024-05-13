@@ -125,8 +125,12 @@ def build_inference(model, tag, dirname):
 
 def _get_image(model):
     """Get Docker image name."""
+    if ":" in model: #if arg is a valid docker name 
+        return model
     # TODO
-    return f"fabianbalsiger/museg:{model}"
+    #return default model if input is not a valid docker name
+    else: 
+        return f"fabianbalsiger/museg:{model}"
 
 
 def _pull_image(image):
