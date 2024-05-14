@@ -77,7 +77,7 @@ def infer(images, dest, format, model, side, tempdir, verbose, nchannel,root):
     for name in list(destfiles):
         if destfiles[name].is_file():
             click.echo(f"Output file already exists: {destfiles[name]}, skipping")
-            images.pop(name)
+            images.remove(name)
             destfiles.pop(name)
 
     if not images:
