@@ -108,7 +108,7 @@ def infer(model, images, outputs=None, *, side=None, tempdir=None):
             else:
                 labelmap = io.load(root / outdir / roiname.format(index=index, side="X"))
 
-        rois.append(labelmap)
+            rois.append(labelmap)
 
         if labels is None:
             # get label names
