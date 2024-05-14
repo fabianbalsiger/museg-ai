@@ -37,9 +37,15 @@ def infer(images, dest, format, model, side, tempdir, verbose, nchannel,root):
     """
     if verbose:
         logging.basicConfig(level=logging.INFO)
-
+    
+    """ WORK IN PROGRESS
+    #check if the number of channel is consistent
     models = api.list_models()
-
+    train_channel=models[model]['nchannel']
+    if train_channel != nchannel:
+        click.echo(f"Error: invalid number of channels (must be {train_channel})")
+        sys.exit(1)
+    """
     if not images:
         # no argument: list available models
         click.echo("Available segmentation models:")
