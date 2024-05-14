@@ -30,6 +30,7 @@ def make_docker(title, outdir, folds=(0, 1, 2, 3, 4), trainer="nnUNetTrainer", d
 DOCKER_FILE = """FROM nvidia/cuda:11.4.3-runtime-ubuntu20.04
 LABEL application={title}
 LABEL author="Fabian Balsiger and Pierre-Yves Baudin"
+LABEL nchannel={nchannel}
 
 ENV PYTHONUNBUFFERED=1
 
