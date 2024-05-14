@@ -85,7 +85,7 @@ def infer(model, images, outputs=None, *, side=None, tempdir=None):
         # run model
         dockerutils.run_inference(model, root)
 
-        # copy labels.txt into bound directory `dirname`
+        # copy labels.txt into bound directory outdir
         client=docker.from_env()
         client.containers.run(
         model,
