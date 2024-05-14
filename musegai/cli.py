@@ -23,7 +23,8 @@ def cli(): ...
 @click.option("--side", default="LR", type=click.Choice(["L", "R", "LR", "NA"]), help="Limb's side(s) in image")
 @click.option("-v", "--verbose", is_flag=True, help="Show more information")
 @click.option("--tempdir", type=click.Path(exists=True), help="Location for temporary files.")
-def infer(images, dest, format, model, side, tempdir, verbose):
+@click.option("--nchannel",type=int,default=2,help="number of channel of the images")
+def infer(images, dest, format, model, side, tempdir, verbose, nchannel):
     """Automatic muscle segmentation command line tool.
 
     \b
@@ -57,13 +58,13 @@ def infer(images, dest, format, model, side, tempdir, verbose):
                 continue
             name, _ = match.groups()
             images.setdefault(name, []).append(file)
-            if len(images[name]) > 2:
+            if len(images[name]) > nchannel:
                 click.echo(f"Expecting two volume files with prefix: {name}")
         click.echo(f"Found {len(images)} volume pair(s) to segment:")
         for name in images:
             click.echo(f"\t{name}")
 
-    elif len(images) == 2 and all(pathlib.Path(file).is_file() for file in images):
+    elif len(images) == nchannel and all(pathlib.Path(file).is_file() for file in images):
         # individual files
         root = "."
         images = [pathlib.Path(file) for file in images]
