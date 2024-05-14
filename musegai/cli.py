@@ -16,7 +16,8 @@ def cli(): ...
 
 
 @cli.command(context_settings={"show_default": True})
-@click.argument("images", type=click.Path(exists=True), nargs=-1)
+# @click.argument("images", type=click.Path(exists=True), nargs=-1)
+@click.argument("images")
 @click.option("-d", "--dest", type=click.Path(), help="Output directory.")
 @click.option("-f", "--format", default=".nii.gz", type=click.Choice([".nii.gz", ".mha", ".mhd", ".hdr"]))
 @click.option("--model", default="thigh-model3", help="Specify the segmentation model.")
@@ -24,13 +25,14 @@ def cli(): ...
 @click.option("-v", "--verbose", is_flag=True, help="Show more information")
 @click.option("--tempdir", type=click.Path(exists=True), help="Location for temporary files.")
 @click.option("--nchannel",type=int,default=2,help="number of channel of the images")
-def infer(images, dest, format, model, side, tempdir, verbose, nchannel):
+@click.option("-r", "--root", type=click.Path(exists=True), help="Root directory for training data.")
+def infer(images, dest, format, model, side, tempdir, verbose, nchannel,root):
     """Automatic muscle segmentation command line tool.
 
     \b
     images can be:
         - (nothing): show available segmentation models
-        - two matching Dixon images to segment
+        - two matching Dixons to segment
         - a single directory with numbered pairs of matching Dixon images
     """
     if verbose:
@@ -44,43 +46,34 @@ def infer(images, dest, format, model, side, tempdir, verbose, nchannel):
         for available_model in models:
             click.echo(f"\t{available_model}")
         sys.exit(0)
-
     # TODO: check nchannel vs image labels
 
-    if (len(images) == 1) and pathlib.Path(images[0]).is_dir():
-        # a folder with volume pairs
-        root = pathlib.Path(images[0])
-        regex = re.compile(r"(.+?)(\d+).[\w.]+$")
-        images = {}
-        for file in sorted(root.glob("*")):
-            match = regex.match(file.name)
-            if not match:
-                continue
-            name, _ = match.groups()
-            images.setdefault(name, []).append(file)
-            if len(images[name]) > nchannel:
-                click.echo(f"Expecting two volume files with prefix: {name}")
-        click.echo(f"Found {len(images)} volume pair(s) to segment:")
-        for name in images:
-            click.echo(f"\t{name}")
-
-    elif len(images) == nchannel and all(pathlib.Path(file).is_file() for file in images):
-        # individual files
-        root = "."
-        images = [pathlib.Path(file) for file in images]
-        name = images[0].name
-        images = {name: images}
-        click.echo(f"Found one volume pair to segment: {name}")
-
+    # find images
+    if pathlib.Path(images).is_absolute():
+        # assume a directory
+        image_files = sorted(pathlib.Path(images).rglob("*"))
     else:
-        # invalid number of arguments
-        click.echo("Expecting two volume files or a single directory")
-        sys.exit(0)
+        root = pathlib.Path(root) if root else pathlib.Path(".")
+        image_files = sorted(root.rglob(images))
 
-    # destination
+    if not image_files:
+        click.echo(f"No image file found, check expression: {images}")
+
+    regex = re.compile(r"(.+?)(\d*)\.([\.\w]+)$")
+    images = {}
+    for file in image_files:
+        match = regex.match(str(file))
+        if not match or not api.is_image(file):
+            continue
+        common, index, ext = match.groups()
+        images.setdefault(common, []).append(file)
+
+    images = [tuple(sorted(images[im]))[:nchannel] for im in sorted(images)]
+        # destination
     dest = pathlib.Path(root if dest is None else dest)
     dest.mkdir(exist_ok=True, parents=True)
-    destfiles = {name: (dest / name).with_suffix(format) for name in images}
+
+    destfiles = {name: (dest /name[0].parent/ name[0].stem).with_suffix(format) for name in images}
     for name in list(destfiles):
         if destfiles[name].is_file():
             click.echo(f"Output file already exists: {destfiles[name]}, skipping")
@@ -97,7 +90,7 @@ def infer(images, dest, format, model, side, tempdir, verbose, nchannel):
 
     # segment images
     click.echo(f"Segmenting {len(images)} volume(s)...")
-    inputs = list(images.values())
+    inputs=images
     outputs = list(destfiles.values())
     api.run_model(model, inputs, outputs, side=side, tempdir=tempdir)
 

@@ -129,7 +129,7 @@ def infer(model, images, outputs=None, *, side=None, tempdir=None):
     # return volumes or files?
     if not outputs:
         return rois, labels
-
     for filename, labelmap in zip(outputs, rois):
+        filename.parent.mkdir(exist_ok=True,parents=True)
         io.save(filename, labelmap)
         io.save_labels(filename.parent / "labels.txt", labels)
