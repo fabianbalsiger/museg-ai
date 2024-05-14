@@ -35,12 +35,16 @@ def infer(images, dest, format, model, side, tempdir, verbose):
     if verbose:
         logging.basicConfig(level=logging.INFO)
 
+    models = api.list_models()
+
     if not images:
         # no argument: list available models
         click.echo("Available segmentation models:")
-        for available_model in api.list_models():
+        for available_model in models:
             click.echo(f"\t{available_model}")
         sys.exit(0)
+
+    # TODO: check nchannel vs image labels
 
     if (len(images) == 1) and pathlib.Path(images[0]).is_dir():
         # a folder with volume pairs

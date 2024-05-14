@@ -16,16 +16,17 @@ TRAIN_IMAGE = "museg-train:v1.1.0"
 
 def list_models(local=True):
     """list existing models"""
+    models = {}
     if local:
         client = docker.from_env()
-        print("images installé sur la machine:")
         for image in client.images.list():
             if "museg" in image.tags[0]:
-                print(image.tags)
+                models[image.tags[0]] = image.labels
+    return models
 
-    return [
-        f"fabianbalsiger/museg:thigh-model3",
-    ]
+    # return [
+    #     f"fabianbalsiger/museg:thigh-model3",
+    # ]
     # client = docker.from_env()
     # images = client.images.search(REPOSITORY)
     # names = [im['name'] for im in images]
@@ -112,12 +113,14 @@ def build_inference(model, tag, dirname):
         fp.write(dockerfile)
 
     # build image
-    image, logs = client.images.build(path=str(dirname), tag=tag, quiet=False, forcerm=True, rm=True)
-    for chunk in logs:
-        if not "stream" in chunk:
-            continue
-        for line in chunk["stream"].splitlines():
-            print(line)
+    print("Run the following command to build the model's docker:")
+    print("docker build <outdir> --tag <model>:<tag>")
+    # image, logs = client.images.build(path=str(dirname), tag=tag, quiet=False, forcerm=True, rm=True)
+    # for chunk in logs:
+    #     if not "stream" in chunk:
+    #         continue
+    #     for line in chunk["stream"].splitlines():
+    #         print(line)
 
 
 # private
