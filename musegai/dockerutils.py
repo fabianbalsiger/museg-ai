@@ -45,7 +45,7 @@ def run_inference(model, dirname):
         device_requests=[docker.types.DeviceRequest(device_ids=["all"], capabilities=[["gpu"]])],
         volumes={dirname: {"bind": "/data", "mode": "rw"}},
     )
-
+    
 
 def check_training():
     """check if training image available"""

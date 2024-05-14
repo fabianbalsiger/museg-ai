@@ -3,6 +3,7 @@ import shutil
 import logging
 import tempfile
 import numpy as np
+import docker
 
 from . import dockerutils, io
 
@@ -83,6 +84,16 @@ def infer(model, images, outputs=None, *, side=None, tempdir=None):
 
         # run model
         dockerutils.run_inference(model, root)
+
+        # copy labels.txt into bound directory `dirname`
+        client=docker.from_env()
+        client.containers.run(
+        model,
+        ['cp', '/labels.txt', '/data/labels.txt'],
+        entrypoint='',
+        remove=True,
+        volumes={root/outdir: {"bind": "/data", "mode": "rw"}},
+        )
 
         # recover outputs
         rois = []
