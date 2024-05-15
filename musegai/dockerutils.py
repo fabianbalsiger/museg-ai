@@ -16,14 +16,22 @@ TRAIN_IMAGE = "museg-train:v1.1.0"
 
 def list_models(local=True):
     """list existing models"""
-    models = {}
+    models = []
     if local:
         client = docker.from_env()
         for image in client.images.list():
             if "museg" in image.tags[0]:
-                models[image.tags[0]] = image.labels
+                models.append(image.tags[0])
     return models
 
+def get_model_info(model):
+    """return info of the designated model"""
+    model_info = {}
+    client = docker.from_env()
+    for image in client.images.list():
+        if f"{model}" == image.tags[0]:
+            model_info[image.tags[0]] = image.labels
+    return model_info[model]
     # return [
     #     f"fabianbalsiger/museg:thigh-model3",
     # ]

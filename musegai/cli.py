@@ -23,7 +23,6 @@ def cli(): ...
 @click.option("--side", default="LR", type=click.Choice(["L", "R", "LR", "NA"]), help="Limb's side(s) in image")
 @click.option("-v", "--verbose", is_flag=True, help="Show more information")
 @click.option("--tempdir", type=click.Path(exists=True), help="Location for temporary files.")
-#@click.option("--nchannel",type=int,default=2,help="number of channel of the images")
 @click.option("-r", "--root", type=click.Path(exists=True), help="Root directory for training data.")
 @click.option("--overwrite",type=bool,default=False,help='specify if you want to overwrite already existing files in output dir')
 def infer(images, dest, format, model, side, tempdir, verbose, overwrite, root):
@@ -47,8 +46,8 @@ def infer(images, dest, format, model, side, tempdir, verbose, overwrite, root):
     # TODO: check nchannel vs image 
     
     #check if the number of channel is consistent
-    models = api.list_models()
-    # nchannel=models[model]['nchannel']
+    model_info = api.get_model_info(model)['nchannel']
+    nchannel=model_info
         # find images
     if pathlib.Path(images).is_absolute():
         # assume a directory
