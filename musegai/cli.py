@@ -199,7 +199,7 @@ def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, out
         for j in range(nchannel):
             click.echo(f"\tchan1:  {images[i][j]}")
         click.echo(f"\tlabels: {rois[i]}")
-    ans = click.confirm("Are all images/rois correcly matched?", abort=True)
+    ans = click.confirm("Are all images/rois correctly matched?", abort=True)
 
     # train model
     split_axis = None if not split else 0
