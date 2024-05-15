@@ -96,7 +96,7 @@ def get_ressources():
     return here.parent / "docker" / "training"
 
 
-def build_inference(model, tag, dirname):
+def build_inference(model, tag, dirname,nchannel):
     """build inference docker"""
     client = docker.from_env()
 

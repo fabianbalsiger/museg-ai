@@ -174,4 +174,4 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
 
     if build_image:
         LOGGER.info(f"Build docker image for model {model} (tag: {tag})")
-        dockerutils.build_inference(model, tag, outdir)
+        dockerutils.build_inference(model, tag, outdir,nchannel)
