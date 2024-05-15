@@ -18,6 +18,7 @@ def cli(): ...
 @cli.command(context_settings={"show_default": True})
 @click.argument("images", nargs=-1)
 @click.option("-d", "--dest", type=click.Path(), help="Output directory.")
+@click.option("--filename", default="roi", help='Segmentation filename.')
 @click.option("-f", "--format", default=".nii.gz", type=click.Choice([".nii.gz", ".mha", ".mhd", ".hdr"]))
 @click.option("--model", default="thigh-model3", help="Specify the segmentation model.")
 @click.option("--side", default="LR", type=click.Choice(["L", "R", "LR", "NA"]), help="Limb's side(s) in image")
@@ -25,7 +26,7 @@ def cli(): ...
 @click.option("--tempdir", type=click.Path(exists=True), help="Location for temporary files.")
 @click.option("-r", "--root", type=click.Path(exists=True), help="Root directory for training data.")
 @click.option("--overwrite", type=bool, default=False, help="specify if you want to overwrite already existing files in output dir")
-def infer(images, dest, format, model, side, tempdir, verbose, overwrite, root):
+def infer(images, dest, filename, format, model, side, tempdir, verbose, overwrite, root):
     """Automatic muscle segmentation command line tool.
 
     \b
@@ -77,11 +78,21 @@ def infer(images, dest, format, model, side, tempdir, verbose, overwrite, root):
         images.setdefault(common, []).append(file)
 
     images = [tuple(sorted(images[im]))[:nchannel] for im in sorted(images)]
+
     # destination
     dest = pathlib.Path(root if dest is None else dest)
     dest.mkdir(exist_ok=True, parents=True)
+    destfiles = {name: (dest / name[0].parent / filename).with_suffix(format) for name in images}
 
-    destfiles = {name: (dest / name[0].parent / name[0].stem).with_suffix(format) for name in images}
+    inputs = images
+    outputs = list(destfiles.values())
+
+    click.echo(f"Found {len(images)} image to segment (num. channels: {nchannel}):")
+    for i in range(len(inputs)):
+        click.echo(f"({i+1})")
+        for j in range(nchannel):
+            click.echo(f"\tchan1:  {images[i][j]}")
+        click.echo(f"\tlabels:  {outputs[i]}")
 
     # dealing whith already existent files in output directory
     if not overwrite:
@@ -101,8 +112,6 @@ def infer(images, dest, format, model, side, tempdir, verbose, overwrite, root):
 
     # segment images
     click.echo(f"Segmenting {len(images)} volume(s)...")
-    inputs = images
-    outputs = list(destfiles.values())
     api.run_model(model, inputs, outputs, side=side, tempdir=tempdir)
 
     click.echo("Done.")
