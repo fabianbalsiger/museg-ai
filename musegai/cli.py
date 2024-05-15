@@ -24,7 +24,7 @@ def cli(): ...
 @click.option("-v", "--verbose", is_flag=True, help="Show more information")
 @click.option("--tempdir", type=click.Path(exists=True), help="Location for temporary files.")
 @click.option("-r", "--root", type=click.Path(exists=True), help="Root directory for training data.")
-@click.option("--overwrite",type=bool,default=False,help='specify if you want to overwrite already existing files in output dir')
+@click.option("--overwrite", type=bool, default=False, help="specify if you want to overwrite already existing files in output dir")
 def infer(images, dest, format, model, side, tempdir, verbose, overwrite, root):
     """Automatic muscle segmentation command line tool.
 
@@ -35,7 +35,7 @@ def infer(images, dest, format, model, side, tempdir, verbose, overwrite, root):
     """
     if verbose:
         logging.basicConfig(level=logging.INFO)
-    
+
     if not images:
         models = api.list_models()
         # no argument: list available models
@@ -44,16 +44,16 @@ def infer(images, dest, format, model, side, tempdir, verbose, overwrite, root):
             click.echo(f"\t{available_model}")
         sys.exit(0)
     elif len(images) > 1:
-        click.echo(f'Invalid number of arguments')
+        click.echo(f"Invalid number of arguments")
         for ims in images:
             click.echo(f'\t{", ".join(map(str, ims))}')
         sys.exit(1)
 
     images = images[0]
-    
-    #check if the number of channel is consistent
+
+    # check if the number of channel is consistent
     model_info = api.get_model_info(model)
-    nchannel = int(model_info['nchannel'])
+    nchannel = int(model_info["nchannel"])
 
     # find images
     if pathlib.Path(images).is_absolute():
@@ -75,15 +75,15 @@ def infer(images, dest, format, model, side, tempdir, verbose, overwrite, root):
             continue
         common, index, ext = match.groups()
         images.setdefault(common, []).append(file)
-    
+
     images = [tuple(sorted(images[im]))[:nchannel] for im in sorted(images)]
-        # destination
+    # destination
     dest = pathlib.Path(root if dest is None else dest)
     dest.mkdir(exist_ok=True, parents=True)
 
-    destfiles = {name: (dest /name[0].parent/ name[0].stem).with_suffix(format) for name in images}
-    
-    #dealing whith already existent files in output directory
+    destfiles = {name: (dest / name[0].parent / name[0].stem).with_suffix(format) for name in images}
+
+    # dealing whith already existent files in output directory
     if not overwrite:
         for name in list(destfiles):
             if destfiles[name].is_file():

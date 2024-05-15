@@ -1,4 +1,4 @@
-def make_docker(title, outdir, folds=(0, 1, 2, 3, 4), trainer="nnUNetTrainer", dataset="001", config="3d_fullres",nchannel=1):
+def make_docker(title, outdir, folds=(0, 1, 2, 3, 4), trainer="nnUNetTrainer", dataset="001", config="3d_fullres", nchannel=1):
     """create the dockerfile from the template below"""
 
     # putting folds in good shape to be processed by CLI :

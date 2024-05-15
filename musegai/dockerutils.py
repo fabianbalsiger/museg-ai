@@ -19,9 +19,10 @@ def list_models(local=True):
     if local:
         client = docker.from_env()
         for image in client.images.list():
-            if image.tags[0].startswith('museg'):
+            if image.tags[0].startswith("museg"):
                 models.append(image.tags[0])
     return models
+
 
 def get_model_info(model):
     """return info of the designated model"""
@@ -54,15 +55,15 @@ def run_inference(model, dirname):
         volumes={dirname: {"bind": "/data", "mode": "rw"}},
     )
 
-     # copy labels.txt into bound directory outdir
+    # copy labels.txt into bound directory outdir
     client.containers.run(
         model,
-        ['cp', '/labels.txt', '/data/labels.txt'],
-        entrypoint='',
+        ["cp", "/labels.txt", "/data/labels.txt"],
+        entrypoint="",
         remove=True,
         volumes={dirname: {"bind": "/data", "mode": "rw"}},
     )
-    
+
 
 def check_training():
     """check if training image available"""
@@ -144,11 +145,11 @@ def build_inference(model, dirname, nchannel):
 
 def _get_image(model):
     """Get Docker image name."""
-    if ":" in model: #if arg is a valid docker name 
+    if ":" in model:  # if arg is a valid docker name
         return model
     # TODO
-    #return default model if input is not a valid docker name
-    else: 
+    # return default model if input is not a valid docker name
+    else:
         return f"fabianbalsiger/museg:{model}"
 
 
