@@ -20,6 +20,7 @@ def make_docker(title, outdir, folds=(0, 1, 2, 3, 4), trainer="nnUNetTrainer", d
         folds=foldstr,
         dataset=dataset,
         config=config,
+        nchannel=nchannel,
     )
     return dockerfile
 
