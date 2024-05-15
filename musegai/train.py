@@ -19,7 +19,7 @@ LOGGER = logging.getLogger(__name__)
 """
 
 
-def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None, train_model=True, build_image=True):
+def train(model, images, rois, outdir, *, labels=None, split_axis=None, train_model=True, dockerfile=True):
     """train new model on provided datasets
 
     Args
@@ -27,7 +27,6 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
         images: sequence of tuples of files/images
         rois: sequence of files/labelmaps
         labels: ITK label object/file
-        tag: model tag (eg. version)
         split_axis: split images into left/right parts
         outdir: output directory for the model files
         tempdir: temporary training directory
@@ -172,6 +171,6 @@ def train(model, images, rois, outdir, *, labels=None, tag=None, split_axis=None
         # store label file
         io.save_labels(outdir / "labels.txt", labels)
 
-    if build_image:
-        LOGGER.info(f"Build docker image for model {model} (tag: {tag})")
-        dockerutils.build_inference(model, tag, outdir,nchannel)
+    if dockerfile:
+        LOGGER.info(f"\nBuild docker image for model {model}")
+        dockerutils.build_inference(model, outdir, nchannel)

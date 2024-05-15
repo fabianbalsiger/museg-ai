@@ -16,7 +16,7 @@ def cli(): ...
 
 
 @cli.command(context_settings={"show_default": True})
-@click.argument("images")
+@click.argument("images", nargs=-1)
 @click.option("-d", "--dest", type=click.Path(), help="Output directory.")
 @click.option("-f", "--format", default=".nii.gz", type=click.Choice([".nii.gz", ".mha", ".mhd", ".hdr"]))
 @click.option("--model", default="thigh-model3", help="Specify the segmentation model.")
@@ -31,24 +31,31 @@ def infer(images, dest, format, model, side, tempdir, verbose, overwrite, root):
     \b
     images can be:
         - (nothing): show available segmentation models
-        - two matching Dixons to segment
-        - a single directory with numbered pairs of matching Dixon images
+        - a file pattern of images to segment (if multiple channels, images must be numbered)
     """
     if verbose:
         logging.basicConfig(level=logging.INFO)
     
     if not images:
+        models = api.list_models()
         # no argument: list available models
         click.echo("Available segmentation models:")
         for available_model in models:
             click.echo(f"\t{available_model}")
         sys.exit(0)
-    # TODO: check nchannel vs image 
+    elif len(images) > 1:
+        click.echo(f'Invalid number of arguments')
+        for ims in images:
+            click.echo(f'\t{", ".join(map(str, ims))}')
+        sys.exit(1)
+
+    images = images[0]
     
     #check if the number of channel is consistent
-    model_info = api.get_model_info(model)['nchannel']
-    nchannel=model_info
-        # find images
+    model_info = api.get_model_info(model)
+    nchannel = int(model_info['nchannel'])
+
+    # find images
     if pathlib.Path(images).is_absolute():
         # assume a directory
         image_files = sorted(pathlib.Path(images).rglob("*"))
@@ -58,6 +65,7 @@ def infer(images, dest, format, model, side, tempdir, verbose, overwrite, root):
 
     if not image_files:
         click.echo(f"No image file found, check expression: {images}")
+        sys.exit(1)
 
     regex = re.compile(r"(.+?)(\d*)\.([\.\w]+)$")
     images = {}
@@ -67,7 +75,7 @@ def infer(images, dest, format, model, side, tempdir, verbose, overwrite, root):
             continue
         common, index, ext = match.groups()
         images.setdefault(common, []).append(file)
-
+    
     images = [tuple(sorted(images[im]))[:nchannel] for im in sorted(images)]
         # destination
     dest = pathlib.Path(root if dest is None else dest)
@@ -105,15 +113,14 @@ def infer(images, dest, format, model, side, tempdir, verbose, overwrite, root):
 @click.argument("images")
 @click.argument("rois")
 @click.option("--train/--no-train", default=True, help="Train model.")
-@click.option("--build/--no-build", default=True, help="Build model image.")
+@click.option("--dockerfile/--no-dockerfile", default=True, help="Make dockerfile.")
 @click.option("-r", "--root", type=click.Path(exists=True), help="Root directory for training data.")
 @click.option("-o", "--outdir", type=click.Path(), help="Output directory for model files.")
 @click.option("--labelfile", type=click.Path(exists=True), help="ITK-Snap label file")
 @click.option("--nchannel", type=int, default=1, help="Expected number of channels")
 @click.option("--split", is_flag=True, help="Split datasets into left and right parts")
-@click.option("--tag", help="docker image tag")
-@click.option("-v", "--verbose", is_flag=True, help="docker image tag")
-def train(model, images, rois, train, build, nchannel, labelfile, root, outdir, split, tag, verbose):
+@click.option("-v", "--verbose", is_flag=True)
+def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, outdir, split, verbose):
     """Create new segmentation model using training images and rois"""
     if verbose:
         logging.basicConfig(level=logging.INFO)
@@ -187,7 +194,7 @@ def train(model, images, rois, train, build, nchannel, labelfile, root, outdir, 
 
     # train model
     split_axis = None if not split else 0
-    api.train_model(model, images, rois, outdir, labels=labelfile, split_axis=split_axis, train_model=train, build_image=build, tag=tag)
+    api.train_model(model, images, rois, outdir, labels=labelfile, split_axis=split_axis, train_model=train, dockerfile=dockerfile)
 
 
 if __name__ == "__main__":

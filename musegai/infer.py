@@ -85,16 +85,6 @@ def infer(model, images, outputs=None, *, side=None, tempdir=None):
         # run model
         dockerutils.run_inference(model, root)
 
-        # copy labels.txt into bound directory outdir
-        client=docker.from_env()
-        client.containers.run(
-        model,
-        ['cp', '/labels.txt', '/data/labels.txt'],
-        entrypoint='',
-        remove=True,
-        volumes={root/outdir: {"bind": "/data", "mode": "rw"}},
-        )
-
         # recover outputs
         rois = []
         for index in range(nimage):

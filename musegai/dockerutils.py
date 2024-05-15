@@ -10,8 +10,7 @@ TODO:
 """
 
 # repository
-REPOSITORY = ...
-TRAIN_IMAGE = "museg-train:v1.1.0"
+TRAIN_IMAGE = "trainer-museg:latest"
 
 
 def list_models(local=True):
@@ -20,7 +19,7 @@ def list_models(local=True):
     if local:
         client = docker.from_env()
         for image in client.images.list():
-            if "museg" in image.tags[0]:
+            if image.tags[0].startswith('museg'):
                 models.append(image.tags[0])
     return models
 
@@ -52,6 +51,15 @@ def run_inference(model, dirname):
         remove=True,
         ipc_mode="host",
         device_requests=[docker.types.DeviceRequest(device_ids=["all"], capabilities=[["gpu"]])],
+        volumes={dirname: {"bind": "/data", "mode": "rw"}},
+    )
+
+     # copy labels.txt into bound directory outdir
+    client.containers.run(
+        model,
+        ['cp', '/labels.txt', '/data/labels.txt'],
+        entrypoint='',
+        remove=True,
         volumes={dirname: {"bind": "/data", "mode": "rw"}},
     )
     
@@ -104,7 +112,7 @@ def get_ressources():
     return here.parent / "docker" / "training"
 
 
-def build_inference(model, tag, dirname,nchannel):
+def build_inference(model, dirname, nchannel):
     """build inference docker"""
     client = docker.from_env()
 
@@ -121,9 +129,9 @@ def build_inference(model, tag, dirname,nchannel):
         fp.write(dockerfile)
 
     # build image
-    print("Run the following command to build the model's docker:")
-    print("docker build <outdir> --tag <model>:<tag>")
-    # image, logs = client.images.build(path=str(dirname), tag=tag, quiet=False, forcerm=True, rm=True)
+    print("\tRun the following command to build the model's docker:")
+    print(f"\tdocker build {dirname}/ --tag {model}")
+    # image, logs = client.images.build(path=str(dirname), quiet=False, forcerm=True, rm=True)
     # for chunk in logs:
     #     if not "stream" in chunk:
     #         continue
