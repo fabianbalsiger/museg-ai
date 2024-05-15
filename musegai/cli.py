@@ -16,7 +16,6 @@ def cli(): ...
 
 
 @cli.command(context_settings={"show_default": True})
-# @click.argument("images", type=click.Path(exists=True), nargs=-1)
 @click.argument("images")
 @click.option("-d", "--dest", type=click.Path(), help="Output directory.")
 @click.option("-f", "--format", default=".nii.gz", type=click.Choice([".nii.gz", ".mha", ".mhd", ".hdr"]))
@@ -24,9 +23,10 @@ def cli(): ...
 @click.option("--side", default="LR", type=click.Choice(["L", "R", "LR", "NA"]), help="Limb's side(s) in image")
 @click.option("-v", "--verbose", is_flag=True, help="Show more information")
 @click.option("--tempdir", type=click.Path(exists=True), help="Location for temporary files.")
-@click.option("--nchannel",type=int,default=2,help="number of channel of the images")
+#@click.option("--nchannel",type=int,default=2,help="number of channel of the images")
 @click.option("-r", "--root", type=click.Path(exists=True), help="Root directory for training data.")
-def infer(images, dest, format, model, side, tempdir, verbose, nchannel,root):
+@click.option("--overwrite",type=bool,default=False,help='specify if you want to overwrite already existing files in output dir')
+def infer(images, dest, format, model, side, tempdir, verbose, overwrite, root):
     """Automatic muscle segmentation command line tool.
 
     \b
@@ -38,23 +38,18 @@ def infer(images, dest, format, model, side, tempdir, verbose, nchannel,root):
     if verbose:
         logging.basicConfig(level=logging.INFO)
     
-    """ WORK IN PROGRESS
-    #check if the number of channel is consistent
-    models = api.list_models()
-    train_channel=models[model]['nchannel']
-    if train_channel != nchannel:
-        click.echo(f"Error: invalid number of channels (must be {train_channel})")
-        sys.exit(1)
-    """
     if not images:
         # no argument: list available models
         click.echo("Available segmentation models:")
         for available_model in models:
             click.echo(f"\t{available_model}")
         sys.exit(0)
-    # TODO: check nchannel vs image labels
-
-    # find images
+    # TODO: check nchannel vs image 
+    
+    #check if the number of channel is consistent
+    models = api.list_models()
+    # nchannel=models[model]['nchannel']
+        # find images
     if pathlib.Path(images).is_absolute():
         # assume a directory
         image_files = sorted(pathlib.Path(images).rglob("*"))
@@ -80,11 +75,14 @@ def infer(images, dest, format, model, side, tempdir, verbose, nchannel,root):
     dest.mkdir(exist_ok=True, parents=True)
 
     destfiles = {name: (dest /name[0].parent/ name[0].stem).with_suffix(format) for name in images}
-    for name in list(destfiles):
-        if destfiles[name].is_file():
-            click.echo(f"Output file already exists: {destfiles[name]}, skipping")
-            images.remove(name)
-            destfiles.pop(name)
+    
+    #dealing whith already existent files in output directory
+    if not overwrite:
+        for name in list(destfiles):
+            if destfiles[name].is_file():
+                click.echo(f"Output file already exists: {destfiles[name]}, skipping")
+                images.remove(name)
+                destfiles.pop(name)
 
     if not images:
         click.echo("Nothing to do.")
@@ -96,7 +94,7 @@ def infer(images, dest, format, model, side, tempdir, verbose, nchannel,root):
 
     # segment images
     click.echo(f"Segmenting {len(images)} volume(s)...")
-    inputs=images
+    inputs = images
     outputs = list(destfiles.values())
     api.run_model(model, inputs, outputs, side=side, tempdir=tempdir)
 
