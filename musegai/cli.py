@@ -136,7 +136,7 @@ def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, out
 
     # output dir
     if not outdir:
-        outdir = pathlib.Path(".") / model
+        outdir = pathlib.Path(".") / model.replace(':','_')
     else:
         outdir = pathlib.Path(outdir)
 
