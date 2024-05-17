@@ -165,12 +165,23 @@ def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, out
         match = regex.match(str(file))
         if not match or not api.is_image(file):
             continue
-        common, index, ext = match.groups()
-        images.setdefault(common, []).append(file)
+        prefix, index, ext = match.groups()
+        images.setdefault(prefix, []).append(file)
 
-    images = [tuple(sorted(images[im]))[:nchannel] for im in sorted(images)]
-    rois = sorted(file for file in roi_files if api.is_image(file))
+    regex = re.compile(r'(.+?)(20\d\d\d\d\d\d)(.+)')
+    rois, roi_dates = {}, {}
+    for file in roi_files:
+        match = regex.match(str(file))
+        if not match or not api.is_image(file):
+            continue
+        prefix, date, _ = match.groups()
+        rois.setdefault(prefix, []).append(file)
+        roi_dates.setdefault(prefix, []).append(date)
 
+    images = [tuple(sorted(images[prefix]))[:nchannel] for prefix in sorted(images)]
+    rois = [tuple(sorted(rois[prefix]))[-1] for prefix in sorted(rois)]
+    roi_dates = list(roi_dates.values())
+    
     nimage = len(images)
     if len(rois) != nimage:
         click.echo(f"Error: found {nimage} images and {len(rois)} rois.")
@@ -197,8 +208,10 @@ def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, out
     for i in range(nimage):
         click.echo(f"({i+1})")
         for j in range(nchannel):
-            click.echo(f"\tchan1:  {images[i][j]}")
+            click.echo(f"\tchan. {j + 1:02d}:  {images[i][j]}")
         click.echo(f"\tlabels: {rois[i]}")
+        if len(roi_dates[i]) > 1:
+            click.echo(f'\t(latest among: {", ".join(roi_dates[i])})')
     ans = click.confirm("Are all images/rois correctly matched?", abort=True)
 
     # train model
