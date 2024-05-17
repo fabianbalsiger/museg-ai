@@ -124,24 +124,24 @@ def infer(images, dest, filename, format, model, side, tempdir, verbose, overwri
 @click.option("--train/--no-train", default=True, help="Train model.")
 @click.option("--dockerfile/--no-dockerfile", default=True, help="Make dockerfile.")
 @click.option("-r", "--root", type=click.Path(exists=True), help="Root directory for training data.")
-@click.option("-o", "--outdir", type=click.Path(), help="Output directory for model files.")
+@click.option("-d", "--dest", type=click.Path(), help="Output directory for model files.")
 @click.option("--labelfile", type=click.Path(exists=True), help="ITK-Snap label file")
 @click.option("--nchannel", type=int, default=1, help="Expected number of channels")
 @click.option("--split", is_flag=True, help="Split datasets into left and right parts")
 @click.option("-v", "--verbose", is_flag=True)
-def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, outdir, split, verbose):
+def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, dest, split, verbose):
     """Create new segmentation model using training images and rois"""
     if verbose:
         logging.basicConfig(level=logging.INFO)
 
     # output dir
-    if not outdir:
-        outdir = pathlib.Path(".") / model.replace(':','_')
+    if not dest:
+        dest = pathlib.Path(".") / model.replace(':','_')
     else:
-        outdir = pathlib.Path(outdir)
+        dest = pathlib.Path(dest)
 
-    if set(pathlib.Path(outdir).glob("*")) and train:
-        click.echo(f"Output folder `{outdir}` is not empty, exiting.")
+    if set(pathlib.Path(dest).glob("*")) and train:
+        click.echo(f"Output folder `{dest}` is not empty, exiting.")
         sys.exit(1)
 
     # find images
@@ -216,7 +216,7 @@ def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, out
 
     # train model
     split_axis = None if not split else 0
-    api.train_model(model, images, rois, outdir, labels=labelfile, split_axis=split_axis, train_model=train, dockerfile=dockerfile)
+    api.train_model(model, images, rois, dest, labels=labelfile, split_axis=split_axis, train_model=train, dockerfile=dockerfile)
 
 
 if __name__ == "__main__":
