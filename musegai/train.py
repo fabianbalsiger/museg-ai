@@ -67,8 +67,7 @@ def train(model, images, rois, outdir, *, labels=None, split_axis=None, train_mo
         # remap index values
         uniquelabels = {name: index for index, name in zip(labels.indices[::-1], labels.descriptions[::-1])}
         labelremap = np.array([uniquelabels[name] for name in labels.descriptions])
-
-    if train_model:
+    if train_model and preprocess:
         LOGGER.info("Start training (num. images: {nimage}, num. channels: {nchannel})")
 
         # create folder structure
@@ -160,6 +159,7 @@ def train(model, images, rois, outdir, *, labels=None, split_axis=None, train_mo
         with open(data_dir / "dataset.json", "w+") as fp:
             json.dump(meta, fp)
 
+    if train_model:
         # run nnU-net training
         LOGGER.info(f"Run nnU-net training")
 

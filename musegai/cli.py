@@ -129,7 +129,7 @@ def infer(images, dest, filename, format, model, side, tempdir, verbose, overwri
 @click.option("--nchannel", type=int, default=1, help="Expected number of channels")
 @click.option("--split", is_flag=True, help="Split datasets into left and right parts")
 @click.option("-v", "--verbose", is_flag=True)
-@click.option("--folds",default=(0,1,2,3,4),help="specify fold numbers to train as tuple")
+@click.option("--folds",help="specify fold numbers to train as tuple")
 @click.option("--preprocess",type=bool,default=True,help="enable or not the preprocessing part")
 def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, dest, split, verbose,folds,preprocess):
     """Create new segmentation model using training images and rois"""
@@ -143,8 +143,12 @@ def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, des
         dest = pathlib.Path(dest)
 
     if set(pathlib.Path(dest).glob("*")) and train:
-        click.echo(f"Output folder `{dest}` is not empty, exiting.")
-        sys.exit(1)
+        click.confirm(f"Output folder `{dest}` is not empty, do you want to continue?",abort=True)
+
+    if folds is None:
+        folds=(0,1,2,3,4)
+    else:
+        folds= tuple(map(int,folds.split(',')))
 
     # find images
     if pathlib.Path(images).is_absolute():
