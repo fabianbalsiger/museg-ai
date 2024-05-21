@@ -124,26 +124,26 @@ def infer(images, dest, filename, format, model, side, tempdir, verbose, overwri
 @click.option("--train/--no-train", default=True, help="Train model.")
 @click.option("--dockerfile/--no-dockerfile", default=True, help="Make dockerfile.")
 @click.option("-r", "--root", type=click.Path(exists=True), help="Root directory for training data.")
-@click.option("-o", "--outdir", type=click.Path(), help="Output directory for model files.")
+@click.option("-d", "--dest", type=click.Path(), help="Output directory for model files.")
 @click.option("--labelfile", type=click.Path(exists=True), help="ITK-Snap label file")
 @click.option("--nchannel", type=int, default=1, help="Expected number of channels")
 @click.option("--split", is_flag=True, help="Split datasets into left and right parts")
 @click.option("-v", "--verbose", is_flag=True)
 @click.option("--folds",default=(0,1,2,3,4),help="specify fold numbers to train as tuple")
 @click.option("--preprocess",type=bool,default=True,help="enable or not the preprocessing part")
-def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, outdir, split, verbose,folds,preprocess):
+def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, dest, split, verbose,folds,preprocess):
     """Create new segmentation model using training images and rois"""
     if verbose:
         logging.basicConfig(level=logging.INFO)
 
     # output dir
-    if not outdir:
-        outdir = pathlib.Path(".") / model.replace(':','_')
+    if not dest:
+        dest = pathlib.Path(".") / model.replace(':','_')
     else:
-        outdir = pathlib.Path(outdir)
+        dest = pathlib.Path(dest)
 
-    if set(pathlib.Path(outdir).glob("*")) and train:
-        click.echo(f"Output folder `{outdir}` is not empty, exiting.")
+    if set(pathlib.Path(dest).glob("*")) and train:
+        click.echo(f"Output folder `{dest}` is not empty, exiting.")
         sys.exit(1)
 
     # find images
@@ -167,12 +167,23 @@ def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, out
         match = regex.match(str(file))
         if not match or not api.is_image(file):
             continue
-        common, index, ext = match.groups()
-        images.setdefault(common, []).append(file)
+        prefix, index, ext = match.groups()
+        images.setdefault(prefix, []).append(file)
 
-    images = [tuple(sorted(images[im]))[:nchannel] for im in sorted(images)]
-    rois = sorted(file for file in roi_files if api.is_image(file))
+    regex = re.compile(r'(.+?)(20\d\d\d\d\d\d)(.+)')
+    rois, roi_dates = {}, {}
+    for file in roi_files:
+        match = regex.match(str(file))
+        if not match or not api.is_image(file):
+            continue
+        prefix, date, _ = match.groups()
+        rois.setdefault(prefix, []).append(file)
+        roi_dates.setdefault(prefix, []).append(date)
 
+    images = [tuple(sorted(images[prefix]))[:nchannel] for prefix in sorted(images)]
+    rois = [tuple(sorted(rois[prefix]))[-1] for prefix in sorted(rois)]
+    roi_dates = list(roi_dates.values())
+    
     nimage = len(images)
     if len(rois) != nimage:
         click.echo(f"Error: found {nimage} images and {len(rois)} rois.")
@@ -199,13 +210,15 @@ def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, out
     for i in range(nimage):
         click.echo(f"({i+1})")
         for j in range(nchannel):
-            click.echo(f"\tchan1:  {images[i][j]}")
+            click.echo(f"\tchan. {j + 1:02d}:  {images[i][j]}")
         click.echo(f"\tlabels: {rois[i]}")
+        if len(roi_dates[i]) > 1:
+            click.echo(f'\t(latest among: {", ".join(roi_dates[i])})')
     ans = click.confirm("Are all images/rois correctly matched?", abort=True)
 
     # train model
     split_axis = None if not split else 0
-    api.train_model(model, images, rois, outdir, labels=labelfile, split_axis=split_axis, train_model=train, dockerfile=dockerfile,folds=folds,preprocess=preprocess)
+    api.train_model(model, images, rois, dest, labels=labelfile, split_axis=split_axis, train_model=train, dockerfile=dockerfile,folds=folds,preprocess=preprocess)
 
 
 if __name__ == "__main__":
