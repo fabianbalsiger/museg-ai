@@ -129,7 +129,9 @@ def infer(images, dest, filename, format, model, side, tempdir, verbose, overwri
 @click.option("--nchannel", type=int, default=1, help="Expected number of channels")
 @click.option("--split", is_flag=True, help="Split datasets into left and right parts")
 @click.option("-v", "--verbose", is_flag=True)
-def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, outdir, split, verbose):
+@click.option("--folds",default=(0,1,2,3,4),help="specify fold numbers to train as tuple")
+@click.option("--preprocess",type=bool,default=True,help="enable or not the preprocessing part")
+def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, outdir, split, verbose,folds,preprocess):
     """Create new segmentation model using training images and rois"""
     if verbose:
         logging.basicConfig(level=logging.INFO)
@@ -203,7 +205,7 @@ def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, out
 
     # train model
     split_axis = None if not split else 0
-    api.train_model(model, images, rois, outdir, labels=labelfile, split_axis=split_axis, train_model=train, dockerfile=dockerfile)
+    api.train_model(model, images, rois, outdir, labels=labelfile, split_axis=split_axis, train_model=train, dockerfile=dockerfile,folds=folds,preprocess=preprocess)
 
 
 if __name__ == "__main__":

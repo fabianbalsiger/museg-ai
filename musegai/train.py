@@ -19,7 +19,7 @@ LOGGER = logging.getLogger(__name__)
 """
 
 
-def train(model, images, rois, outdir, *, labels=None, split_axis=None, train_model=True, dockerfile=True):
+def train(model, images, rois, outdir, *, labels=None, split_axis=None, train_model=True, dockerfile=True,folds=(0,1,2,3,4),preprocess=True):
     """train new model on provided datasets
 
     Args
@@ -163,7 +163,7 @@ def train(model, images, rois, outdir, *, labels=None, split_axis=None, train_mo
         # run nnU-net training
         LOGGER.info(f"Run nnU-net training")
 
-        dockerutils.run_training(model, outdir)
+        dockerutils.run_training(model, outdir,folds=folds,preprocess=preprocess)
 
         # store model files
         outdir.mkdir(parents=True, exist_ok=True)
@@ -173,4 +173,4 @@ def train(model, images, rois, outdir, *, labels=None, split_axis=None, train_mo
 
     if dockerfile:
         LOGGER.info(f"\nBuild docker image for model {model}")
-        dockerutils.build_inference(model, outdir, nchannel)
+        dockerutils.build_inference(model, outdir, nchannel,folds=folds)

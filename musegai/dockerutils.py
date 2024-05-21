@@ -71,7 +71,7 @@ def check_training():
     return True
 
 
-def run_training(model, dirname):
+def run_training(model, dirname,folds=(0,1,2,3,4),preprocess=True):
     """Run training"""
     dirname = str(pathlib.Path(dirname).resolve())
     client = docker.from_env()
@@ -97,14 +97,20 @@ def run_training(model, dirname):
         return container.status
 
     # preprocess
-    status = run("nnUNetv2_plan_and_preprocess", ["-d", "001", "-c", "3d_fullres", "--verify_dataset_integrity"])
+    if preprocess:
+        status = run("nnUNetv2_plan_and_preprocess", ["-d", "001", "-c", "3d_fullres", "--verify_dataset_integrity"])
 
     # train
-    status = run("nnUNetv2_train", ["001", "3d_fullres", "0"])
-    status = run("nnUNetv2_train", ["001", "3d_fullres", "1"])
-    status = run("nnUNetv2_train", ["001", "3d_fullres", "2"])
-    status = run("nnUNetv2_train", ["001", "3d_fullres", "3"])
-    status = run("nnUNetv2_train", ["001", "3d_fullres", "4"])
+    if 0 in folds:
+        status = run("nnUNetv2_train", ["001", "3d_fullres", "0"])
+    if 1 in folds:
+        status = run("nnUNetv2_train", ["001", "3d_fullres", "1"])
+    if 2 in folds:
+        status = run("nnUNetv2_train", ["001", "3d_fullres", "2"])
+    if 3 in folds:
+        status = run("nnUNetv2_train", ["001", "3d_fullres", "3"])
+    if 4 in folds:
+        status = run("nnUNetv2_train", ["001", "3d_fullres", "4"])
 
 
 def get_ressources():
@@ -113,12 +119,12 @@ def get_ressources():
     return here.parent / "docker" / "training"
 
 
-def build_inference(model, dirname, nchannel):
+def build_inference(model, dirname, nchannel,folds=(0,1,2,3,4)):
     """build inference docker"""
     client = docker.from_env()
 
     # get docker template
-    dockerfile = docker_template.make_docker(model, dirname, folds=(0, 1, 2, 3, 4))
+    dockerfile = docker_template.make_docker(model, dirname, folds)
     # dockerfile = docker_template.make_docker(model, dirname, folds=(0,))
 
     # get the requirement file
