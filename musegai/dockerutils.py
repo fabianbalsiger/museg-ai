@@ -71,7 +71,7 @@ def check_training():
     return True
 
 
-def run_training(model, dirname,folds=(0,1,2,3,4),preprocess=True):
+def run_training(model, dirname, folds=(0, 1, 2, 3, 4), preprocess=True):
     """Run training"""
     dirname = str(pathlib.Path(dirname).resolve())
     client = docker.from_env()
@@ -119,7 +119,7 @@ def get_ressources():
     return here.parent / "docker" / "training"
 
 
-def build_inference(model, dirname, nchannel,folds=(0,1,2,3,4)):
+def build_inference(model, dirname, nchannel, folds=(0, 1, 2, 3, 4)):
     """build inference docker"""
     client = docker.from_env()
 

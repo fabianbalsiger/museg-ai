@@ -103,7 +103,7 @@ def infer(model, images, outputs=None, *, side=None, tempdir=None):
         if labels is None:
             # get label names
             labels = io.load_labels(tmp / "labels.txt")
-    
+
     # fix labels sides
     if side == "LR":
         descr = [d + "_R" if l > 0 else d for l, d in zip(labels.indices, labels.descriptions)]

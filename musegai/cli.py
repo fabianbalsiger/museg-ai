@@ -18,7 +18,7 @@ def cli(): ...
 @cli.command(context_settings={"show_default": True})
 @click.argument("images", nargs=-1)
 @click.option("-d", "--dest", type=click.Path(), help="Output directory.")
-@click.option("--filename", default="roi", help='Segmentation filename.')
+@click.option("--filename", default="roi", help="Segmentation filename.")
 @click.option("-f", "--format", default=".nii.gz", type=click.Choice([".nii.gz", ".mha", ".mhd", ".hdr"]))
 @click.option("--model", default="thigh-model3", help="Specify the segmentation model.")
 @click.option("--side", default="LR", type=click.Choice(["L", "R", "LR", "NA"]), help="Limb's side(s) in image")
@@ -129,26 +129,26 @@ def infer(images, dest, filename, format, model, side, tempdir, verbose, overwri
 @click.option("--nchannel", type=int, default=1, help="Expected number of channels")
 @click.option("--split", is_flag=True, help="Split datasets into left and right parts")
 @click.option("-v", "--verbose", is_flag=True)
-@click.option("--folds",help="specify fold numbers to train as tuple")
-@click.option("--preprocess",type=bool,default=True,help="enable or not the preprocessing part")
-def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, dest, split, verbose,folds,preprocess):
+@click.option("--folds", help="specify fold numbers to train as tuple")
+@click.option("--preprocess", type=bool, default=True, help="enable or not the preprocessing part")
+def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, dest, split, verbose, folds, preprocess):
     """Create new segmentation model using training images and rois"""
     if verbose:
         logging.basicConfig(level=logging.INFO)
 
     # output dir
     if not dest:
-        dest = pathlib.Path(".") / model.replace(':','_')
+        dest = pathlib.Path(".") / model.replace(":", "_")
     else:
         dest = pathlib.Path(dest)
 
     if set(pathlib.Path(dest).glob("*")) and train:
-        click.confirm(f"Output folder `{dest}` is not empty, do you want to continue?",abort=True)
+        click.confirm(f"Output folder `{dest}` is not empty, do you want to continue?", abort=True)
 
     if folds is None:
-        folds=(0,1,2,3,4)
+        folds = (0, 1, 2, 3, 4)
     else:
-        folds= tuple(map(int,folds.split(',')))
+        folds = tuple(map(int, folds.split(",")))
 
     # find images
     if pathlib.Path(images).is_absolute():
@@ -174,13 +174,13 @@ def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, des
         prefix, index, ext = match.groups()
         images.setdefault(prefix, []).append(file)
 
-    regex = re.compile(r'(.+?)(20\d\d\d\d\d\d)(.+)')
+    regex = re.compile(r"(.+?)(20\d\d\d\d\d\d)(.+)")
     rois, roi_dates = {}, {}
     for file in roi_files:
         match = regex.match(str(file))
         if not api.is_image(file):
             continue
-        elif not match: # no date
+        elif not match:  # no date
             prefix = str(file)
             date = 0
         else:
@@ -191,7 +191,7 @@ def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, des
     images = [tuple(sorted(images[prefix]))[:nchannel] for prefix in sorted(images)]
     rois = [tuple(sorted(rois[prefix]))[-1] for prefix in sorted(rois)]
     roi_dates = list(roi_dates.values())
-    
+
     nimage = len(images)
     if len(rois) != nimage:
         click.echo(f"Error: found {nimage} images and {len(rois)} rois.")
@@ -226,7 +226,7 @@ def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, des
 
     # train model
     split_axis = None if not split else 0
-    api.train_model(model, images, rois, dest, labels=labelfile, split_axis=split_axis, train_model=train, dockerfile=dockerfile,folds=folds,preprocess=preprocess)
+    api.train_model(model, images, rois, dest, labels=labelfile, split_axis=split_axis, train_model=train, dockerfile=dockerfile, folds=folds, preprocess=preprocess)
 
 
 if __name__ == "__main__":
