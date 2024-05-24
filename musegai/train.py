@@ -109,7 +109,7 @@ def train(model, images, rois, outdir, *, labels=None, split_axis=None, train_mo
                     # reindex labels
                     labels = labels.subset(labelset, reindex=True)
             elif labelset != set(_labelset):
-                raise ValueError(f"Inconsistent label values in dataset {index}: {labelset} != {_labelset}")
+                raise ValueError(f"Inconsistent label values in dataset {index + 1}: {labelset} != {_labelset}")
 
             if split_axis is not None:
                 # split into halves (eg. left and right sides)
