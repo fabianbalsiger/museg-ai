@@ -178,9 +178,13 @@ def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, des
     rois, roi_dates = {}, {}
     for file in roi_files:
         match = regex.match(str(file))
-        if not match or not api.is_image(file):
+        if not api.is_image(file):
             continue
-        prefix, date, _ = match.groups()
+        elif not match: # no date
+            prefix = str(file)
+            date = 0
+        else:
+            prefix, date, _ = match.groups()
         rois.setdefault(prefix, []).append(file)
         roi_dates.setdefault(prefix, []).append(date)
 
