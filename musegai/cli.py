@@ -219,7 +219,7 @@ def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, des
         click.echo(f"({i+1})")
         for j in range(nchannel):
             click.echo(f"\tchan. {j + 1:02d}:  {images[i][j]}")
-        click.echo(f"\tlabels: {rois[i]}")
+        click.echo(f"\tlabels:    {rois[i]}")
         if len(roi_dates[i]) > 1:
             click.echo(f'\t(latest among: {", ".join(roi_dates[i])})')
     ans = click.confirm("Are all images/rois correctly matched?", abort=True)
