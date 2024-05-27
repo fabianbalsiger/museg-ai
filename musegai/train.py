@@ -19,7 +19,7 @@ LOGGER = logging.getLogger(__name__)
 """
 
 
-def train(model, images, rois, outdir, *, labels=None, split_axis=None, train_model=True, dockerfile=True, folds=(0, 1, 2, 3, 4), preprocess=True):
+def train(model, images, rois, outdir, *, labels=None, split_axis=None, train_model=True, make_dockerfile=True, folds=(0, 1, 2, 3, 4), preprocess=True):
     """train new model on provided datasets
 
     Args
@@ -67,6 +67,7 @@ def train(model, images, rois, outdir, *, labels=None, split_axis=None, train_mo
         # remap index values
         uniquelabels = {name: index for index, name in zip(labels.indices[::-1], labels.descriptions[::-1])}
         labelremap = np.array([uniquelabels[name] for name in labels.descriptions])
+
     if train_model and preprocess:
         LOGGER.info("Start training (num. images: {nimage}, num. channels: {nchannel})")
 
@@ -140,7 +141,6 @@ def train(model, images, rois, outdir, *, labels=None, split_axis=None, train_mo
                     io.save(data_dir / imagedir / imagename.format(num=num, channel=channel), image)
                 num += 1
 
-        LOGGER.info(f"Done copying training data (num. training: {num})")
 
         # metadata
         channel_names = {f"{i}": f"mag{i:02d}" for i in range(nchannel)}
@@ -159,18 +159,20 @@ def train(model, images, rois, outdir, *, labels=None, split_axis=None, train_mo
         with open(data_dir / "dataset.json", "w+") as fp:
             json.dump(meta, fp)
 
-    if train_model:
-        # run nnU-net training
-        LOGGER.info(f"Run nnU-net training")
-
-        dockerutils.run_training(model, outdir, folds=folds, preprocess=preprocess)
-
-        # store model files
-        outdir.mkdir(parents=True, exist_ok=True)
-
         # store label file
         io.save_labels(outdir / "labels.txt", labels)
 
-    if dockerfile:
-        LOGGER.info(f"\nBuild docker image for model {model}")
-        dockerutils.build_inference(model, outdir, nchannel, folds=folds)
+        LOGGER.info(f"Done copying training data (num. training: {num})")
+        
+    if train_model:
+        # run nnU-net training
+        LOGGER.info(f"Run nnU-net training")
+        dockerutils.run_training(model, outdir, folds=folds, preprocess=preprocess)
+
+    if make_dockerfile:
+        LOGGER.info(f"\nGenerate dockerfile for model {model}")
+        # list folds
+        fold_dirs = list((outdir / 'nnUNet_results').rglob('fold_*/checkpoint_final.pth'))
+        folds = [int(dirname.parent.name.split('_')[1]) for dirname in fold_dirs]
+        # make dockerfile
+        dockerutils.make_dockerfile(model, outdir, nchannel, folds=folds)
