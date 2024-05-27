@@ -168,7 +168,6 @@ def train(model, images, rois, labels, outdir, *, split_axis=None, train_model=T
         LOGGER.info(f"Done copying training data (num. training: {num})")
 
     if train_model:
-        breakpoint()
         # run nnU-net training
         LOGGER.info(f"Run nnU-net training")
         dockerutils.run_training(model, outdir, folds=folds, preprocess=preprocess)
