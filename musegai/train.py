@@ -141,7 +141,6 @@ def train(model, images, rois, outdir, *, labels=None, split_axis=None, train_mo
                     io.save(data_dir / imagedir / imagename.format(num=num, channel=channel), image)
                 num += 1
 
-
         # metadata
         channel_names = {f"{i}": f"mag{i:02d}" for i in range(nchannel)}
         # force label 0 at 'background'
@@ -163,7 +162,7 @@ def train(model, images, rois, outdir, *, labels=None, split_axis=None, train_mo
         io.save_labels(outdir / "labels.txt", labels)
 
         LOGGER.info(f"Done copying training data (num. training: {num})")
-        
+
     if train_model:
         # run nnU-net training
         LOGGER.info(f"Run nnU-net training")
@@ -172,7 +171,7 @@ def train(model, images, rois, outdir, *, labels=None, split_axis=None, train_mo
     if make_dockerfile:
         LOGGER.info(f"\nGenerate dockerfile for model {model}")
         # list folds
-        fold_dirs = list((outdir / 'nnUNet_results').rglob('fold_*/checkpoint_final.pth'))
-        folds = [int(dirname.parent.name.split('_')[1]) for dirname in fold_dirs]
+        fold_dirs = list((outdir / "nnUNet_results").rglob("fold_*/checkpoint_final.pth"))
+        folds = [int(dirname.parent.name.split("_")[1]) for dirname in fold_dirs]
         # make dockerfile
         dockerutils.make_dockerfile(model, outdir, nchannel, folds=folds)
