@@ -184,8 +184,34 @@ class Labels:
         return iter(self.indices)
 
     def __getitem__(self, item):
-        dct = dict(zip(self.indices, self.descriptions))
+        if isinstance(item, int):
+            dct = dict(zip(self.indices, self.descriptions))
+        elif isinstance(item, str):
+            dct = dict(zip(self.descriptions, self.indices))
+        else:
+            raise ValueError(f'Invalid item type: {item}')
         return dct[item]
+    
+    def append(self, description, *, color=None, transparency=1, visibility=1):
+        if color is None:
+            color = np.random.randint(0, 255, 3)
+        color = tuple(color)
+        self.indices.append(len(self))
+        self.descriptions.append(str(description))
+        self.colors.append(color)
+        self.transparency.append(transparency)
+        self.visibility.append(visibility)
+
+    def remove(self, item, reindex=True):
+        if isinstance(item, int):
+            index = self.indices.index(item)
+        if isinstance(item, str):
+            index = self.descriptions.index(item)
+        else:
+            raise ValueError(f'Invalid item type: {item}')
+        indices = [i for i in self.indices if i != index]
+        return self.subset(indices, reindex=reindex)
+
 
     def subset(self, indices, reindex=True):
         num = len(indices)
