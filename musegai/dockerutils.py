@@ -19,8 +19,11 @@ def list_models(local=True):
     if local:
         client = docker.from_env()
         for image in client.images.list():
-            if image.tags[0].startswith("museg"):
-                models.append(image.tags[0])
+            try:
+                if image.tags[0].startswith("museg"):
+                    models.append(image.tags[0])
+            except IndexError:
+                pass
     return models
 
 
@@ -29,8 +32,11 @@ def get_model_info(model):
     model_info = {}
     client = docker.from_env()
     for image in client.images.list():
-        if f"{model}" == image.tags[0]:
-            model_info[image.tags[0]] = image.labels
+        try:
+            if f"{model}" == image.tags[0]:
+                model_info[image.tags[0]] = image.labels
+        except IndexError:
+            pass        
     return model_info[model]
     # return [
     #     f"fabianbalsiger/museg:thigh-model3",
