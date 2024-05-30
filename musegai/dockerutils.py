@@ -125,7 +125,7 @@ def get_ressources():
     return here.parent / "docker" / "training"
 
 
-def build_inference(model, dirname, nchannel, folds=(0, 1, 2, 3, 4)):
+def make_dockerfile(model, dirname, nchannel, folds=(0, 1, 2, 3, 4)):
     """build inference docker"""
     client = docker.from_env()
 
@@ -142,7 +142,7 @@ def build_inference(model, dirname, nchannel, folds=(0, 1, 2, 3, 4)):
         fp.write(dockerfile)
 
     # build image
-    print("\tRun the following command to build the model's docker:")
+    print("Run the following command to build the model's docker:")
     print(f"\tdocker build {dirname}/ --tag {model}")
     # image, logs = client.images.build(path=str(dirname), quiet=False, forcerm=True, rm=True)
     # for chunk in logs:

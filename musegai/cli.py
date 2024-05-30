@@ -124,16 +124,16 @@ def infer(images, dest, filename, format, model, side, tempdir, verbose, overwri
 @click.argument("model")
 @click.argument("images")
 @click.argument("rois")
+@click.option("--labelfile", type=click.Path(exists=True), required=True, help="ITK-Snap label file")
 @click.option("--train/--no-train", default=True, help="Train model.")
 @click.option("--dockerfile/--no-dockerfile", default=True, help="Make dockerfile.")
+@click.option("--preprocess/--no-preprocess", default=True, help="enable or not the preprocessing part")
 @click.option("-r", "--root", type=click.Path(exists=True), help="Root directory for training data.")
 @click.option("-d", "--dest", type=click.Path(), help="Output directory for model files.")
-@click.option("--labelfile", type=click.Path(exists=True), help="ITK-Snap label file")
 @click.option("--nchannel", type=int, default=1, help="Expected number of channels")
 @click.option("--split", is_flag=True, help="Split datasets into left and right parts")
 @click.option("-v", "--verbose", is_flag=True)
 @click.option("--folds", help="specify fold numbers to train as tuple")
-@click.option("--preprocess", type=bool, default=True, help="enable or not the preprocessing part")
 def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, dest, split, verbose, folds, preprocess):
     """Create new segmentation model using training images and rois"""
     if verbose:
@@ -229,7 +229,7 @@ def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, des
 
     # train model
     split_axis = None if not split else 0
-    api.train_model(model, images, rois, dest, labels=labelfile, split_axis=split_axis, train_model=train, dockerfile=dockerfile, folds=folds, preprocess=preprocess)
+    api.train_model(model, images, rois, labelfile, dest, split_axis=split_axis, train_model=train, make_dockerfile=dockerfile, folds=folds, preprocess=preprocess)
 
 
 if __name__ == "__main__":
