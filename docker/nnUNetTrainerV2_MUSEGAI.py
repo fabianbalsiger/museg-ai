@@ -1,6 +1,9 @@
 """Custom nnU-Net trainer allowing to ignore unsegmented image slices in a volume when computing the loss."""
 from __future__ import annotations
 
+import SimpleITK as sitk
+import numpy as np
+
 from pathlib import Path
 
 import batchgenerators.utilities.file_and_folder_operations as ffops
@@ -66,3 +69,82 @@ class nnUNetTrainerV2_MUSEGAI(trainerV2.nnUNetTrainerV2):
             {},
             ignore_label=plans["num_classes"],
         )
+
+class nnUNetTrainer_interactive(nnUNetTrainerV2_MUSEGAI):
+    """custom nnUNet Trainer that train also for interactive segmentation and model refinement"""
+
+    def __init__(
+            self,
+            plans_file,
+            fold,
+            output_folder=None,
+            dataset_directory=None,
+            batch_dice=True,
+            stage=None,
+            unpack_data=True,
+            deterministic=True,
+            fp16=False,
+            max_iter=5, # maximal number of click during an iteration of training
+            nbr_supervised=0.5 #number of image that are trained with clicks
+        ):
+            """Initialize the nnU-Net trainer for muscle segmentation."""
+            super().__init__(
+                plans_file,
+                fold,
+                output_folder,
+                dataset_directory,
+                batch_dice,
+                stage,
+                unpack_data,
+                deterministic,
+                fp16,
+            )
+            self.max_iter=max_iter
+            self.nbr_supervised=nbr_supervised
+
+    def train_step(self, batch: dict) -> dict:
+        data = batch['data']
+        target = batch['target']
+
+        data = data.to(self.device, non_blocking=True)
+        if isinstance(target, list):
+            target = [i.to(self.device, non_blocking=True) for i in target]
+        else:
+            target = target.to(self.device, non_blocking=True)
+        
+        #Part where we are going to simulate clicks:
+        #starting by creating channel to store clicks:
+        h,w,d==sitk.getsize(data[0])
+        nbr_labels=...
+        background_T=sitk.Image((h,w,d),sitk.sitkFloat32)
+        foreground_T=sitk.Image((h,w,d*nbr_labels),sitk.sitkFloat32)
+        for image in data:
+            for k in range(self.max_iter):
+            #we first want to get map probabilities
+                inputs=np.concatenate((image,foreground_T,background_T),axis=0)
+                ...  
+
+
+
+
+        self.optimizer.zero_grad(set_to_none=True)
+        # Autocast can be annoying
+        # If the device_type is 'cpu' then it's slow as heck and needs to be disabled.
+        # If the device_type is 'mps' then it will complain that mps is not implemented, even if enabled=False is set. Whyyyyyyy. (this is why we don't make use of enabled=False)
+        # So autocast will only be active if we have a cuda device.
+        with autocast(self.device.type, enabled=True) if self.device.type == 'cuda' else dummy_context():
+            output = self.network(data)
+            # del data
+            l = self.loss(output, target)
+
+        if self.grad_scaler is not None:
+            self.grad_scaler.scale(l).backward()
+            self.grad_scaler.unscale_(self.optimizer)
+            torch.nn.utils.clip_grad_norm_(self.network.parameters(), 12)
+            self.grad_scaler.step(self.optimizer)
+            self.grad_scaler.update()
+        else:
+            l.backward()
+            torch.nn.utils.clip_grad_norm_(self.network.parameters(), 12)
+            self.optimizer.step()
+        return {'loss': l.detach().cpu().numpy()}
