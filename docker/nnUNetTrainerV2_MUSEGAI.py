@@ -3,13 +3,14 @@ from __future__ import annotations
 
 import SimpleITK as sitk
 import numpy as np
+import json
 
 from pathlib import Path
 
 import batchgenerators.utilities.file_and_folder_operations as ffops
 import nnunet.training.network_training.nnUNetTrainerV2 as trainerV2
 from nnunet.training.loss_functions.dice_loss import DC_and_CE_loss
-
+import nnunetv2.training.nnUNetTrainer.nnUNetTrainer as nnUNetTrainer
 
 class DC_and_CE_loss_improved(DC_and_CE_loss):
     """Wrapper of the DC_and_CE_loss that does return 0 instead of NaN when the target only consists of the ignored label.
@@ -70,37 +71,32 @@ class nnUNetTrainerV2_MUSEGAI(trainerV2.nnUNetTrainerV2):
             ignore_label=plans["num_classes"],
         )
 
-class nnUNetTrainer_interactive(nnUNetTrainerV2_MUSEGAI):
-    """custom nnUNet Trainer that train also for interactive segmentation and model refinement"""
+class nnUNetTrainer_interactive(nnUNetTrainer.nnUNetTrainer):
+    """custom nnUNet Trainer that train also for interactive segmentation and prediction refinement"""
 
-    def __init__(
-            self,
-            plans_file,
-            fold,
-            output_folder=None,
-            dataset_directory=None,
-            batch_dice=True,
-            stage=None,
-            unpack_data=True,
-            deterministic=True,
-            fp16=False,
-            max_iter=5, # maximal number of click during an iteration of training
-            nbr_supervised=0.5 #number of image that are trained with clicks
-        ):
-            """Initialize the nnU-Net trainer for muscle segmentation."""
-            super().__init__(
-                plans_file,
-                fold,
-                output_folder,
-                dataset_directory,
-                batch_dice,
-                stage,
-                unpack_data,
-                deterministic,
-                fp16,
+    def __init__(self, 
+                plans: dict, 
+                configuration: str, 
+                fold: int, 
+                dataset_json: dict,
+                unpack_dataset: bool = True,
+                device: torch.device = torch.device('cuda')
+                max_iter=5, 
+                nbr_supervised=0.5
             )
-            self.max_iter=max_iter
-            self.nbr_supervised=nbr_supervised
+        :
+            """Initialize the nnU-Net trainer for muscle segmentation."""
+            super().__init__(self, 
+            plans: dict, 
+            configuration: str, 
+            fold: int, 
+            dataset_json: dict,
+            unpack_dataset: bool = True,
+            device: torch.device = torch.device('cuda')
+            )
+            self.max_iter=max_iter # maximal number of click during an iteration of training
+            self.nbr_supervised=nbr_supervised  # number of image that are trained with clicks
+            
 
     def train_step(self, batch: dict) -> dict:
         data = batch['data']
@@ -113,17 +109,20 @@ class nnUNetTrainer_interactive(nnUNetTrainerV2_MUSEGAI):
             target = target.to(self.device, non_blocking=True)
         
         #Part where we are going to simulate clicks:
-        #starting by creating channel to store clicks:
+        #starting by creating channels to store clicks:
         h,w,d==sitk.getsize(data[0])
-        nbr_labels=...
+        #get the number of labels
+        #label_dict=json.load(open('dataset.json','r'))
+        nbr_labels=len(dataset_json['labels'])-1 #-1 because we don't count the background label 
+
         background_T=sitk.Image((h,w,d),sitk.sitkFloat32)
         foreground_T=sitk.Image((h,w,d*nbr_labels),sitk.sitkFloat32)
+
         for image in data:
             for k in range(self.max_iter):
             #we first want to get map probabilities
                 inputs=np.concatenate((image,foreground_T,background_T),axis=0)
                 ...  
-
 
 
 
@@ -148,3 +147,6 @@ class nnUNetTrainer_interactive(nnUNetTrainerV2_MUSEGAI):
             torch.nn.utils.clip_grad_norm_(self.network.parameters(), 12)
             self.optimizer.step()
         return {'loss': l.detach().cpu().numpy()}
+
+
+import nnUNet
