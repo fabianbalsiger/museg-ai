@@ -4,14 +4,17 @@ from __future__ import annotations
 import SimpleITK as sitk
 import numpy as np
 import json
+import torch
 
 from pathlib import Path
 
 import batchgenerators.utilities.file_and_folder_operations as ffops
 import nnunet.training.network_training.nnUNetTrainerV2 as trainerV2
 from nnunet.training.loss_functions.dice_loss import DC_and_CE_loss
-import nnunetv2.training.nnUNetTrainer.nnUNetTrainer as nnUNetTrainer
 
+
+import nnunetv2.training.nnUNetTrainer.nnUNetTrainer as nnUNetTrainer
+import nnunetv2.inference.predict_from_raw_data as nnUNetPredict
 class DC_and_CE_loss_improved(DC_and_CE_loss):
     """Wrapper of the DC_and_CE_loss that does return 0 instead of NaN when the target only consists of the ignored label.
 
@@ -71,7 +74,7 @@ class nnUNetTrainerV2_MUSEGAI(trainerV2.nnUNetTrainerV2):
             ignore_label=plans["num_classes"],
         )
 
-class nnUNetTrainer_interactive(nnUNetTrainer.nnUNetTrainer):
+class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
     """custom nnUNet Trainer that train also for interactive segmentation and prediction refinement"""
 
     def __init__(self, 
@@ -80,22 +83,21 @@ class nnUNetTrainer_interactive(nnUNetTrainer.nnUNetTrainer):
                 fold: int, 
                 dataset_json: dict,
                 unpack_dataset: bool = True,
-                device: torch.device = torch.device('cuda')
+                device: torch.device = torch.device('cuda'),
                 max_iter=5, 
-                nbr_supervised=0.5
-            )
-        :
+                nbr_supervised=0.5,
+            ):
             """Initialize the nnU-Net trainer for muscle segmentation."""
-            super().__init__(self, 
-            plans: dict, 
-            configuration: str, 
-            fold: int, 
-            dataset_json: dict,
-            unpack_dataset: bool = True,
-            device: torch.device = torch.device('cuda')
+            super().__init__(plans,
+            configuration,
+            fold,
+            dataset_json,
+            unpack_dataset,
+            device,
             )
-            self.max_iter=max_iter # maximal number of click during an iteration of training
-            self.nbr_supervised=nbr_supervised  # number of image that are trained with clicks
+            self.max_iter = max_iter # maximal number of click during an iteration of training
+            self.nbr_supervised = nbr_supervised  # number of image that are trained with clicks
+            self.dataset_json = dataset_json #info on the dataset -> maybe not useful
             
 
     def train_step(self, batch: dict) -> dict:
@@ -110,18 +112,54 @@ class nnUNetTrainer_interactive(nnUNetTrainer.nnUNetTrainer):
         
         #Part where we are going to simulate clicks:
         #starting by creating channels to store clicks:
-        h,w,d==sitk.getsize(data[0])
+
+        h,w,d=sitk.getsize(data[0])
+
         #get the number of labels
+
         #label_dict=json.load(open('dataset.json','r'))
         nbr_labels=len(dataset_json['labels'])-1 #-1 because we don't count the background label 
 
         background_T=sitk.Image((h,w,d),sitk.sitkFloat32)
         foreground_T=sitk.Image((h,w,d*nbr_labels),sitk.sitkFloat32)
 
-        for image in data:
+        #function to decide if we simulate the k-th click
+        def do_simulate(k,N):
+            return np.random.binomial(n=1,p=1-k/N)
+        
+        temp_model=nnUNetPredict.nnUNetPrecidctor()
+        temp_model.initialize_from_trained_model_folder(outdir) #ou est outdir ???
+
+        for image, groundtruth in zip(data,target):
             for k in range(self.max_iter):
             #we first want to get map probabilities
                 inputs=np.concatenate((image,foreground_T,background_T),axis=0)
+                if do_simulate(k,self.max_iter):
+                    #calcul des probas ici 
+                    prediction,probabilities = temp_model.predict_single_npy_array(inputs,images_properties={'spacing':...},save_or_return_probabilities=True)
+                    test = groundtruth == prediction
+                    misslabeled_index = np.argwhere(~test) #getting indexes of misslabeled pixels
+                    for slice in range(d):
+                        misslabeled_count = nbr_labels*[0]
+                        for i in [index for index in misslabeled_index if index[0]==d]:
+                            label=groundtruth[tuple(i)]
+                            misslabeled_count[label]+=1
+
+                    #getting the worst predicted label
+                    max_value = max(misslabeled_count)
+                    worst_labels = [i for i, x in enumerate(misslabeled_count) if x == max_value]
+                    if len(worst_labels) != 1:
+                        #if there is more than 1 label, we pick one randomly
+                        chosen_label = np.random.choice(worst_labels)
+                    else:
+                        chosen_label = worst_labels[0]
+                    #simulation du clique ici
+                    
+                    inputs[tuple(click)] = 1 #a changer si on change les tenseurs foreground et background
+                else:
+                    break
+                data[data.index(image)] = inputs #computation time too important for this ???
+
                 ...  
 
 
@@ -147,6 +185,3 @@ class nnUNetTrainer_interactive(nnUNetTrainer.nnUNetTrainer):
             torch.nn.utils.clip_grad_norm_(self.network.parameters(), 12)
             self.optimizer.step()
         return {'loss': l.detach().cpu().numpy()}
-
-
-import nnUNet
