@@ -54,7 +54,10 @@ def infer(images, dest, filename, format, model, side, tempdir, verbose, overwri
 
     # check if the number of channel is consistent
     model_info = api.get_model_info(model)
-    nchannel = int(model_info["nchannel"])
+    if model == 'fabianbalsiger/museg:thigh-model3':
+        nchannel=2
+    else:
+        nchannel = int(model_info["nchannel"])
 
     # find images
     if pathlib.Path(images).is_absolute():
