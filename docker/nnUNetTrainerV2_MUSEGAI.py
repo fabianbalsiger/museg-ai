@@ -136,13 +136,15 @@ class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
             for k in range(self.max_iter):
             #we first want to get map probabilities
                 if do_simulate(k,self.max_iter):
-                    #calcul des probas ici 
+                    # using current network to have prediction & probabilities 
+                    # NOT WORKING YET, TODO:
                     prediction,probabilities = temp_model.predict_single_npy_array(inputs,images_properties={'spacing':...},save_or_return_probabilities=True)
                     test = groundtruth == prediction #test matrix to find prediction's mistakes
                     misslabeled_index = np.argwhere(~test) #getting indexes of misslabeled pixels
                     for slice in range(d):
+                        # !!!NE PRENDS PAS EN COMPTE LE BACKGROUND POUR L INSTANT 
                         misslabeled_count = nbr_labels*[0]
-                        for i in [index for index in misslabeled_index if index[0]==d]:
+                        for i in [index for index in misslabeled_index if index[0]==slice]:
                             label=groundtruth[tuple(i)]
                             misslabeled_count[label]+=1     
 
@@ -155,7 +157,7 @@ class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
                     else:
                         chosen_label = worst_labels[0]
                     #simulation du clique ici
-                    potential_click=[index for index in misslabeled_index if groundtruth[tuple(index)]==chosen_label and index[0]==d]
+                    potential_click=[index for index in misslabeled_index if groundtruth[tuple(index)]==chosen_label and index[0]==slice]
                     D={}
                     for coordinate in potential_click:
                         D[coordinate]=probabilities[tuple(coordinate)]
@@ -164,10 +166,13 @@ class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
                     for coordinate in D.items():
                         if coordinate[1] == max_value:
                             final_list.append(coordinate[0])
-                    click = np.random.choice(final_list)    
-                    inputs[tuple(click)] = 1 #a changer si on change les tenseurs foreground et background
+                    click = np.random.choice(final_list)
+                      
+                    inputs[tuple(click)] = 1 #a changer si on change les tenseurs foreground et background -> !!! à modifier 
                 else:
                     break
+                #here we smoothed the click data
+                ...
                 #writing the simulation for optimisation...
                 data[data.index(image)] = inputs
 
