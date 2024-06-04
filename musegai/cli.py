@@ -143,7 +143,7 @@ def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, des
     if not dest:
         dest = pathlib.Path(".") / model.replace(":", "_")
     else:
-        dest = pathlib.Path(dest)
+        dest = pathlib.Path(dest.strip())
 
     if set(pathlib.Path(dest).glob("*")) and train:
         click.confirm(f"Output folder `{dest}` is not empty, do you want to continue?", abort=True)

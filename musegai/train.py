@@ -68,9 +68,13 @@ def train(model, images, rois, labels, outdir, *, split_axis=None, train_model=T
     labels.append('ignore', color=(255, 0, 0), visibility=0)
     ignore_label = labels['ignore']
     # remap index values
-    uniquelabels = {name: index for index, name in zip(labels.indices[::-1], labels.descriptions[::-1])}
-    labelremap = np.array([uniquelabels[name] for name in labels.descriptions])
-
+    uniquelabels = set(labels.descriptions)
+    labelset = set(labels[name] for name in uniquelabels)
+    labelremap = -1 * np.ones(max(labels.indices) + 1, dtype=int)
+    labelremap[np.array(list(labelset), dtype=int)] = np.arange(len(uniquelabels))
+    # reindex labels
+    labels = labels.subset(labelset)
+    
     if train_model and preprocess:
         LOGGER.info("Start training (num. images: {nimage}, num. channels: {nchannel})")
 
@@ -87,7 +91,7 @@ def train(model, images, rois, labels, outdir, *, split_axis=None, train_model=T
 
         # check and copy each volume
         num = 0
-        labelset = None
+        # labelset = None
         for index in range(nimage):
             LOGGER.info(f"Loading dataset {index + 1}/{nimage}")
 
@@ -98,23 +102,16 @@ def train(model, images, rois, labels, outdir, *, split_axis=None, train_model=T
             empty_slices = np.all(labelmap.array == 0, axis=(0, 1))
             labelmap.array[:, :, empty_slices] = ignore_label
 
-            if labelremap is not None:
-                labelmap.array = labelremap[labelmap.array]
+            # check labels
+            _labelset = np.unique(labelmap)
+            if not set(_labelset) <= labelset:
+                raise ValueError(f"Inconsistent label values in dataset {index + 1}: {_labelset} not included in {labelset}.")
+            elif set(_labelset) != labelset:
+                diff = [labels[i] for i in (set(_labelset) - labelset)]
+                print(f'Warning, in dataset {index + 1}, some labels are missing: {diff}')
 
-            # make label values contiguous
-            _labelset, array = np.unique(labelmap, return_inverse=True)
-            labelmap.array = array.reshape(labelmap.shape)
-
-            # setup labels
-            if labelset is None:
-                labelset = set(_labelset)
-                # check label indices
-                if not labelset <= set(labels.indices):
-                    raise ValueError(f"Labels object does not contain all label values")
-                # reindex labels
-                labels = labels.subset(labelset, reindex=True)
-            elif labelset != set(_labelset):
-                raise ValueError(f"Inconsistent label values in dataset {index + 1}: {labelset} != {_labelset}")
+            # remap labelmap (remove duplicate label names, make labels consecutive)
+            labelmap.array = labelremap[labelmap.array]
 
             if split_axis is not None:
                 # split into halves (eg. left and right sides)

@@ -105,8 +105,10 @@ def run_training(model, dirname, folds=(0, 1, 2, 3, 4), preprocess=True):
     # preprocess
     if preprocess:
         status = run("nnUNetv2_plan_and_preprocess", ["-d", "001", "-c", "3d_fullres", "--verify_dataset_integrity"])
+        # "-pl nnUNetPlannerResEncL" # (M/L/XL)
 
     # train
+    # -p nnUNetResEncUNetLPlans # (M/L/XL)
     if 0 in folds:
         status = run("nnUNetv2_train", ["001", "3d_fullres", "0"])
     if 1 in folds:
