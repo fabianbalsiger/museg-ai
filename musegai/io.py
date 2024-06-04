@@ -191,12 +191,12 @@ class Labels:
         else:
             raise ValueError(f'Invalid item type: {item}')
         return dct[item]
-    
+
     def append(self, description, *, color=None, transparency=1, visibility=1):
         if color is None:
             color = np.random.randint(0, 255, 3)
         color = tuple(color)
-        self.indices.append(len(self))
+        self.indices.append(max(self.indices) + 1)
         self.descriptions.append(str(description))
         self.colors.append(color)
         self.transparency.append(transparency)
@@ -215,12 +215,13 @@ class Labels:
 
     def subset(self, indices, reindex=True):
         num = len(indices)
+        true_indices = {self.indices.index(i) for i in indices}
         return Labels(
             list(range(num)) if reindex else indices,
-            [self.descriptions[i] for i in indices],
-            [self.colors[i] for i in indices],
-            [self.transparency[i] for i in indices],
-            [self.visibility[i] for i in indices],
+            [self.descriptions[i] for i in true_indices],
+            [self.colors[i] for i in true_indices],
+            [self.transparency[i] for i in true_indices],
+            [self.visibility[i] for i in true_indices],
         )
 
     @classmethod
