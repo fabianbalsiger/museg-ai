@@ -130,7 +130,7 @@ def make_dockerfile(model, dirname, nchannel, folds=(0, 1, 2, 3, 4)):
     client = docker.from_env()
 
     # get docker template
-    dockerfile = docker_template.make_docker(model, dirname, folds)
+    dockerfile = docker_template.make_docker(model, dirname, folds, nchannel=nchannel)
     # dockerfile = docker_template.make_docker(model, dirname, folds=(0,))
 
     # get the requirement file
