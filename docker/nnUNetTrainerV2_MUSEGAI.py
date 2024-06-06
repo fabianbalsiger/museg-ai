@@ -84,7 +84,7 @@ class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
                 fold: int, 
                 dataset_json: dict,
                 unpack_dataset: bool = True,
-                device: torch.device = device('cuda'),
+                device: device = device('cuda'),
                 max_iter=5, 
                 nbr_supervised=0.5,
             ):
@@ -104,7 +104,7 @@ class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
     def train_step(self, batch: dict) -> dict:
         data = batch['data']
         target = batch['target']
-
+        breakpoint()
         data = data.to(self.device, non_blocking=True)
         if isinstance(target, list):
             target = [i.to(self.device, non_blocking=True) for i in target]
@@ -175,7 +175,6 @@ class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
                 ...
                 #writing the simulation for optimisation...
                 data[data.index(image)] = inputs
-
 
 
         self.optimizer.zero_grad(set_to_none=True)
