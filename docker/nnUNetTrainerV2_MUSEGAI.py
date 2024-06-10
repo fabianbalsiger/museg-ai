@@ -122,8 +122,6 @@ class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
         #label_dict=json.load(open('dataset.json','r'))
         nbr_labels=len(self.dataset_json['labels'])-1 #-1 because we don't count the background label 
 
-        # background_T=sitk.Image((h,w,d),sitk.sitkFloat32)
-        # foreground_T=sitk.Image((h,w,d*nbr_labels),sitk.sitkFloat32)
         background_T=torch.zeros(1,d,h,w,device='cuda')
         foreground_T=torch.zeros(1,d*nbr_labels,h,w,device='cuda')
 
@@ -134,7 +132,6 @@ class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
         self.network.eval() #putting the model in inference mode, needed to simulate click
         for image, groundtruth in zip(data,target[0]):
             inputs=torch.cat((image,foreground_T,background_T),axis=1)
-            groundtruth = groundtruth[]
             for k in range(self.max_iter):
             #we first want to get map probabilities
                 if do_simulate(k,self.max_iter):
