@@ -144,6 +144,16 @@ def train(model, images, rois, labels, outdir, *, split_axis=None, train_model=T
                     image = io.load(images[index][channel])
                     io.save(data_dir / imagedir / imagename.format(num=num, channel=channel), image)
                 num += 1
+            #adding click channels
+            def add_click_chan(image,nlabels):
+                """image is one single image (case) with all its channels"""
+
+                click_chan=image[0]
+                for k in range(nlabels):
+                    click_chan.array = 0 * image.array
+                    io.save(data_dir/imagedir/imagename.format(num=num-1, channel=nchannel+k), click_chan)
+            breakpoint()
+            add_click_chan(image[0],len(labels.indices))
 
         # metadata
         channel_names = {f"{i}": f"mag{i:02d}" for i in range(nchannel)}
