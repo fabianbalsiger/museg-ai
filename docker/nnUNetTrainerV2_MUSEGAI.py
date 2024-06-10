@@ -4,18 +4,19 @@ from __future__ import annotations
 import SimpleITK as sitk
 import numpy as np
 import json
-from torch import autocast, nn
-from torch import device
+import torch
 from pathlib import Path
+
+import nnunetv2.training.nnUNetTrainer.nnUNetTrainer as nnUNetTrainer
+from nnunetv2.utilities.helpers import dummy_context
+from nnunetv2.inference.export_prediction import convert_predicted_logits_to_segmentation_with_correct_shape
 
 import batchgenerators.utilities.file_and_folder_operations as ffops
 import nnunet.training.network_training.nnUNetTrainerV2 as trainerV2
 from nnunet.training.loss_functions.dice_loss import DC_and_CE_loss
 
 
-import nnunetv2.training.nnUNetTrainer.nnUNetTrainer as nnUNetTrainer
-import nnunetv2.inference.predict_from_raw_data as nnUNetPredict
-from nnunetv2.utilities.helpers import dummy_context
+
 class DC_and_CE_loss_improved(DC_and_CE_loss):
     """Wrapper of the DC_and_CE_loss that does return 0 instead of NaN when the target only consists of the ignored label.
 
@@ -84,7 +85,7 @@ class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
                 fold: int, 
                 dataset_json: dict,
                 unpack_dataset: bool = True,
-                device: device = device('cuda'),
+                device: torch.device = torch.device('cuda'),
                 max_iter=5, 
                 nbr_supervised=0.5,
             ):
@@ -114,36 +115,39 @@ class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
         #Part where we are going to simulate clicks:
         #starting by creating channels to store clicks:
 
-        h,w,d=sitk.getsize(data[0])
+        _,d,h,w= data[0].size()
 
         #get the number of labels
 
         #label_dict=json.load(open('dataset.json','r'))
         nbr_labels=len(self.dataset_json['labels'])-1 #-1 because we don't count the background label 
 
-        background_T=sitk.Image((h,w,d),sitk.sitkFloat32)
-        foreground_T=sitk.Image((h,w,d*nbr_labels),sitk.sitkFloat32)
+        # background_T=sitk.Image((h,w,d),sitk.sitkFloat32)
+        # foreground_T=sitk.Image((h,w,d*nbr_labels),sitk.sitkFloat32)
+        background_T=torch.zeros(1,d,h,w,device='cuda')
+        foreground_T=torch.zeros(1,d*nbr_labels,h,w,device='cuda')
 
         #function to decide if we simulate the k-th click
         def do_simulate(k,N):
             return np.random.binomial(n=1,p=1-k/N)
         
-        temp_model=nnUNetPredict.nnUNetPrecidctor()
-        temp_model.initialize_from_trained_model_folder(outdir) #ou est outdir ???
-
-        for image, groundtruth in zip(data,target):
-            inputs=np.concatenate((image,foreground_T,background_T),axis=0)
+        self.network.eval() #putting the model in inference mode, needed to simulate click
+        for image, groundtruth in zip(data,target[0]):
+            inputs=torch.cat((image,foreground_T,background_T),axis=1)
+            groundtruth = groundtruth[]
             for k in range(self.max_iter):
             #we first want to get map probabilities
                 if do_simulate(k,self.max_iter):
                     # using current network to have prediction & probabilities 
-                    # NOT WORKING YET, TODO:
-                    prediction,probabilities = temp_model.predict_single_npy_array(inputs,images_properties={'spacing':...},save_or_return_probabilities=True)
+                    with torch.no_grad():
+                        logits = self.network(inputs)
+                        prediction, probabilities = convert_predicted_logits_to_segmentation_with_correct_shape(logits,save_probabilities=True)
+                    
                     test = groundtruth == prediction #test matrix to find prediction's mistakes
                     misslabeled_index = np.argwhere(~test) #getting indexes of misslabeled pixels
+
                     for slice in range(d):
-                        # !!!NE PRENDS PAS EN COMPTE LE BACKGROUND POUR L INSTANT 
-                        misslabeled_count = nbr_labels*[0]
+                        misslabeled_count = (nbr_labels+1)*[0] #+1 because we add the background label 
                         for i in [index for index in misslabeled_index if index[0]==slice]:
                             label=groundtruth[tuple(i)]
                             misslabeled_count[label]+=1     
@@ -175,14 +179,14 @@ class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
                 ...
                 #writing the simulation for optimisation...
                 data[data.index(image)] = inputs
-
+        self.network.train() #putting the model back to training mode 
 
         self.optimizer.zero_grad(set_to_none=True)
         # Autocast can be annoying
         # If the device_type is 'cpu' then it's slow as heck and needs to be disabled.
         # If the device_type is 'mps' then it will complain that mps is not implemented, even if enabled=False is set. Whyyyyyyy. (this is why we don't make use of enabled=False)
         # So autocast will only be active if we have a cuda device.
-        with autocast(self.device.type, enabled=True) if self.device.type == 'cuda' else dummy_context():
+        with torch.autocast(self.device.type, enabled=True) if self.device.type == 'cuda' else dummy_context():
             output = self.network(data)
             # del data
             l = self.loss(output, target)
@@ -190,11 +194,11 @@ class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
         if self.grad_scaler is not None:
             self.grad_scaler.scale(l).backward()
             self.grad_scaler.unscale_(self.optimizer)
-            nn.utils.clip_grad_norm_(self.network.parameters(), 12)
+            torch.nn.utils.clip_grad_norm_(self.network.parameters(), 12)
             self.grad_scaler.step(self.optimizer)
             self.grad_scaler.update()
         else:
             l.backward()
-            nn.utils.clip_grad_norm_(self.network.parameters(), 12)
+            torch.nn.utils.clip_grad_norm_(self.network.parameters(), 12)
             self.optimizer.step()
         return {'loss': l.detach().cpu().numpy()}
