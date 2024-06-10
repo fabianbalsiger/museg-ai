@@ -76,14 +76,14 @@ def train(model, images, rois, labels, outdir, *, split_axis=None, train_model=T
 
         # create folder structure
         root = pathlib.Path(outdir)
-        root.mkdir(parents=True)
-        (root / "nnUNet_raw").mkdir()
-        (root / "nnUNet_results").mkdir()
-        (root / "nnUNet_preprocessed").mkdir()
+        root.mkdir(parents=True,exist_ok=True)
+        (root / "nnUNet_raw").mkdir(exist_ok=True)
+        (root / "nnUNet_results").mkdir(exist_ok=True)
+        (root / "nnUNet_preprocessed").mkdir(exist_ok=True)
         data_dir = root / "nnUNet_raw/Dataset001"
-        data_dir.mkdir()
-        (data_dir / imagedir).mkdir()
-        (data_dir / labeldir).mkdir()
+        data_dir.mkdir(exist_ok=True)
+        (data_dir / imagedir).mkdir(exist_ok=True)
+        (data_dir / labeldir).mkdir(exist_ok=True)
 
         # check and copy each volume
         num = 0
@@ -147,16 +147,21 @@ def train(model, images, rois, labels, outdir, *, split_axis=None, train_model=T
             #adding click channels
             def add_click_chan(image,nlabels):
                 """image is one single image (case) with all its channels"""
-
-                click_chan=image[0]
+                click_chan=io.load(image[0])
                 for k in range(nlabels):
-                    click_chan.array = 0 * image.array
+                    click_chan.array = 0 * click_chan.array
                     io.save(data_dir/imagedir/imagename.format(num=num-1, channel=nchannel+k), click_chan)
-            breakpoint()
-            add_click_chan(image[0],len(labels.indices))
+
+            
+            add_click_chan(images[index],len(labels.indices))
 
         # metadata
         channel_names = {f"{i}": f"mag{i:02d}" for i in range(nchannel)}
+
+        for k in range(len(labels.indices)-1): #addding metadata for click channels
+            channel_names[f"{nchannel+k}"]=f"{labels[k+1]}_clicks"
+        channel_names[f'{len(labels)+nchannel}'] = 'background_clicks'
+
         label_names = {labels[i]: i for i in labels}
 
         # store JSON metadata
