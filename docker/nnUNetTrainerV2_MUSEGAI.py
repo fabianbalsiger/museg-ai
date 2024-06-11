@@ -86,8 +86,8 @@ class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
                 dataset_json: dict,
                 unpack_dataset: bool = True,
                 device: torch.device = torch.device('cuda'),
-                max_iter=5, 
-                nbr_supervised=0.5,
+                #max_iter=5, 
+                #nbr_supervised=0.5,
             ):
             """Initialize the nnU-Net trainer for muscle segmentation."""
             super().__init__(plans,
@@ -97,8 +97,9 @@ class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
             unpack_dataset,
             device,
             )
-            self.max_iter = max_iter # maximal number of click during an iteration of training
-            self.nbr_supervised = nbr_supervised  # number of image that are trained with clicks
+
+            self.max_iter = 5#max_iter # maximal number of click during an iteration of training
+            self.nbr_supervised = 0.5#nbr_supervised  # number of image that are trained with clicks
             self.dataset_json = dataset_json #info on the dataset -> maybe not useful
             
 
@@ -119,11 +120,11 @@ class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
 
         #get the number of labels
 
-        #label_dict=json.load(open('dataset.json','r'))
-        nbr_labels=len(self.dataset_json['labels'])-1 #-1 because we don't count the background label 
+        
+        nbr_labels=len(self.dataset_json['labels'])-2 #-2 because we don't count the background label & the ignore label
 
-        background_T=torch.zeros(1,d,h,w,device='cuda')
-        foreground_T=torch.zeros(1,d*nbr_labels,h,w,device='cuda')
+        # background_T=torch.zeros(1,d,h,w,device='cuda')
+        # foreground_T=torch.zeros(1,d*nbr_labels,h,w,device='cuda')
 
         #function to decide if we simulate the k-th click
         def do_simulate(k,N):
@@ -131,15 +132,19 @@ class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
         
         self.network.eval() #putting the model in inference mode, needed to simulate click
         for image, groundtruth in zip(data,target[0]):
-            inputs=torch.cat((image,foreground_T,background_T),axis=1)
+            inputs=image
+            #inputs=torch.cat((image,foreground_T,background_T),axis=1)
             for k in range(self.max_iter):
             #we first want to get map probabilities
                 if do_simulate(k,self.max_iter):
                     # using current network to have prediction & probabilities 
                     with torch.no_grad():
-                        logits = self.network(inputs)
-                        prediction, probabilities = convert_predicted_logits_to_segmentation_with_correct_shape(logits,save_probabilities=True)
-                    
+                        logits = self.network(data)
+                        prediction, probabilities = convert_predicted_logits_to_segmentation_with_correct_shape(logits,plans_manager=self.plans,
+                                                                                                                ConfigurationManager=self.Configuration,
+                                                                                                                label_manager=self.dataset_json,
+                                                                                                                return_probabilities=True)
+                    #!!! next line might be not working -> if the prediction is in color and the labels are int. 
                     test = groundtruth == prediction #test matrix to find prediction's mistakes
                     misslabeled_index = np.argwhere(~test) #getting indexes of misslabeled pixels
 
