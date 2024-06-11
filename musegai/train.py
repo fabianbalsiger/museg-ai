@@ -158,9 +158,8 @@ def train(model, images, rois, labels, outdir, *, split_axis=None, train_model=T
         # metadata
         channel_names = {f"{i}": f"mag{i:02d}" for i in range(nchannel)}
 
-        for k in range(len(labels.indices)-1): #addding metadata for click channels
-            channel_names[f"{nchannel+k}"]=f"{labels[k+1]}_clicks"
-        channel_names[f'{len(labels)+nchannel}'] = 'background_clicks'
+        for k in range(len(labels.indices)): #addding metadata for click channels
+            channel_names[f"{nchannel+k}"]="noNorm"
 
         label_names = {labels[i]: i for i in labels}
 
