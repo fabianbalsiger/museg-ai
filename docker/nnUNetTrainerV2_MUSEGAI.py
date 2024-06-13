@@ -106,7 +106,6 @@ class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
     def train_step(self, batch: dict) -> dict:
         data = batch['data']
         target = batch['target']
-        breakpoint()
         data = data.to(self.device, non_blocking=True)
         if isinstance(target, list):
             target = [i.to(self.device, non_blocking=True) for i in target]
@@ -121,10 +120,7 @@ class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
         #get the number of labels
 
         
-        nbr_labels=len(self.dataset_json['labels'])-2 #-2 because we don't count the background label & the ignore label
-
-        # background_T=torch.zeros(1,d,h,w,device='cuda')
-        # foreground_T=torch.zeros(1,d*nbr_labels,h,w,device='cuda')
+        nbr_labels=len(self.dataset_json['labels'])-1 #-1 because we don't count the ignore label
 
         #function to decide if we simulate the k-th click
         def do_simulate(k,N):
@@ -133,48 +129,47 @@ class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
         self.network.eval() #putting the model in inference mode, needed to simulate click
         for image, groundtruth in zip(data,target[0]):
             inputs=image
-            #inputs=torch.cat((image,foreground_T,background_T),axis=1)
             for k in range(self.max_iter):
             #we first want to get map probabilities
                 if do_simulate(k,self.max_iter):
                     # using current network to have prediction & probabilities 
                     with torch.no_grad():
+                        breakpoint()
                         logits = self.network(data)
-                        prediction, probabilities = convert_predicted_logits_to_segmentation_with_correct_shape(logits,plans_manager=self.plans,
-                                                                                                                ConfigurationManager=self.Configuration,
-                                                                                                                label_manager=self.dataset_json,
-                                                                                                                return_probabilities=True)
-                    #!!! next line might be not working -> if the prediction is in color and the labels are int. 
-                    test = groundtruth == prediction #test matrix to find prediction's mistakes
-                    misslabeled_index = np.argwhere(~test) #getting indexes of misslabeled pixels
+                        probabilities = torch.softmax(logits[0],dim=1)
+                        prediction = torch.max(probabilities,dim=1)
+                    for nimage in range(2): #hard coded here -> need to find a way to get batch size
+                        test = groundtruth[nimage] == prediction[nimage] #test matrix to find prediction's mistakes
+                        misslabeled_indexes = torch.nonzero(~test) #getting indexes of misslabeled pixels
 
-                    for slice in range(d):
-                        misslabeled_count = (nbr_labels+1)*[0] #+1 because we add the background label 
-                        for i in [index for index in misslabeled_index if index[0]==slice]:
-                            label=groundtruth[tuple(i)]
-                            misslabeled_count[label]+=1     
+                        for slice in range(d):
+                            misslabeled_count = (nbr_labels)*[0]
+                            for i in [index for index in misslabeled_indexes if index[0]==slice]:
+                                label=groundtruth[tuple(i)]
+                                misslabeled_count[int(label.item)]+=1    
 
-                    #getting the worst predicted label
-                    max_value = max(misslabeled_count)
-                    worst_labels = [i for i, x in enumerate(misslabeled_count) if x == max_value]
-                    if len(worst_labels) != 1:
-                        #if there is more than one label, we pick one randomly
-                        chosen_label = np.random.choice(worst_labels)
-                    else:
-                        chosen_label = worst_labels[0]
-                    #simulation du clique ici
-                    potential_click=[index for index in misslabeled_index if groundtruth[tuple(index)]==chosen_label and index[0]==slice]
-                    D={}
-                    for coordinate in potential_click:
-                        D[coordinate]=probabilities[tuple(coordinate)]
-                    max_value = max(D.values)
-                    final_list=[]
-                    for coordinate in D.items():
-                        if coordinate[1] == max_value:
-                            final_list.append(coordinate[0])
-                    click = np.random.choice(final_list)
-                      
-                    inputs[tuple(click)] = 1 #a changer si on change les tenseurs foreground et background -> !!! à modifier 
+                            #getting the worst predicted label
+                            max_value = max(misslabeled_count)
+                            worst_labels = [i for i, x in enumerate(misslabeled_count) if x == max_value]
+                            if len(worst_labels) != 1:
+                                #if there is more than one label, we pick one randomly
+                                chosen_label = np.random.choice(worst_labels)
+                            else:
+                                chosen_label = worst_labels[0]
+
+                            #simulation du clique ici
+                            potential_click=[index for index in misslabeled_indexes if groundtruth[tuple(index)]==chosen_label and index[0]==slice]
+                            # D={}
+                            # for coordinate in potential_click:
+                            #     D[coordinate]=probabilities[tuple(coordinate)]
+                            # max_value = max(D.values)
+                            # final_list=[]
+                            # for coordinate in D.items():
+                            #     if coordinate[1] == max_value:
+                            #         final_list.append(coordinate[0])
+                            # click = np.random.choice(final_list)
+                            click=np.random.choice(potential_click)
+                            inputs[tuple(click)] = 1  
                 else:
                     break
                 #here we smoothed the click data
