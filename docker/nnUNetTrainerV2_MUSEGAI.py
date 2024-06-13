@@ -114,41 +114,45 @@ class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
         
         #Part where we are going to simulate clicks:
         #starting by creating channels to store clicks:
-
         _,d,h,w= data[0].size()
+        groundtruth=target[0]
 
         #get the number of labels
 
-        
-        nbr_labels=len(self.dataset_json['labels'])-1 #-1 because we don't count the ignore label
+        if 'ignore_label' in self.dataset_json['labels'].keys():
+            nbr_labels=len(self.dataset_json['labels'])-1 #-1 because we don't count the ignore label
+        else:
+            nbr_labels=len(self.dataset_json['labels'])
 
         #function to decide if we simulate the k-th click
         def do_simulate(k,N):
             return np.random.binomial(n=1,p=1-k/N)
         
         self.network.eval() #putting the model in inference mode, needed to simulate click
-        for image, groundtruth in zip(data,target[0]):
+        for image in data:
             inputs=image
             for k in range(self.max_iter):
             #we first want to get map probabilities
                 if do_simulate(k,self.max_iter):
                     # using current network to have prediction & probabilities 
                     with torch.no_grad():
-                        breakpoint()
+                         
                         logits = self.network(data)
                         probabilities = torch.softmax(logits[0],dim=1)
-                        prediction = torch.max(probabilities,dim=1)
+                        _,prediction = torch.max(probabilities,dim=1)
                     for nimage in range(2): #hard coded here -> need to find a way to get batch size
-                        test = groundtruth[nimage] == prediction[nimage] #test matrix to find prediction's mistakes
+                        test = groundtruth[nimage][0] == prediction[nimage] #test matrix to find prediction's mistakes
                         misslabeled_indexes = torch.nonzero(~test) #getting indexes of misslabeled pixels
-
+                        misslabeled_indexes = misslabeled_indexes.tolist()
                         for slice in range(d):
                             misslabeled_count = (nbr_labels)*[0]
-                            for i in [index for index in misslabeled_indexes if index[0]==slice]:
-                                label=groundtruth[tuple(i)]
-                                misslabeled_count[int(label.item)]+=1    
-
+                            per_slice= [index for index in misslabeled_indexes if index[0]==slice]
+                           
+                            for i in per_slice:
+                                label=groundtruth[(nimage,0)+tuple(i)]
+                                misslabeled_count[int(label.item())]+=1     
                             #getting the worst predicted label
+                           
                             max_value = max(misslabeled_count)
                             worst_labels = [i for i, x in enumerate(misslabeled_count) if x == max_value]
                             if len(worst_labels) != 1:
@@ -158,7 +162,12 @@ class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
                                 chosen_label = worst_labels[0]
 
                             #simulation du clique ici
-                            potential_click=[index for index in misslabeled_indexes if groundtruth[tuple(index)]==chosen_label and index[0]==slice]
+                            breakpoint()
+                            potential_click=torch.nonzero(prediction[nimage] == torch.full(tuple(prediction[nimage].size()),chosen_label,device=self.device))
+                            mask=(potential_click[:,0]==slice)
+                            potential_click=potential_click[mask]
+                            # potential_click=[index for index in potential_click if index in misslabeled_indexes]
+                            #potential_click=[index for index in per_slice if groundtruth[(0,)+tuple(index)]==chosen_label]
                             # D={}
                             # for coordinate in potential_click:
                             #     D[coordinate]=probabilities[tuple(coordinate)]
@@ -168,8 +177,8 @@ class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
                             #     if coordinate[1] == max_value:
                             #         final_list.append(coordinate[0])
                             # click = np.random.choice(final_list)
-                            click=np.random.choice(potential_click)
-                            inputs[tuple(click)] = 1  
+                            click=potential_click[np.random.randint(0,len(potential_click)-1)]
+                            inputs[(chosen_label+1,)+tuple(click)] = 1  
                 else:
                     break
                 #here we smoothed the click data
