@@ -6,6 +6,7 @@ import numpy as np
 import json
 import torch
 from pathlib import Path
+import torchvision.transforms.functional as F
 
 import nnunetv2.training.nnUNetTrainer.nnUNetTrainer as nnUNetTrainer
 from nnunetv2.utilities.helpers import dummy_context
@@ -114,7 +115,7 @@ class interactive_nnUNetTrainer(nnUNetTrainer):
         
         #Part where we are going to simulate clicks:
         #starting by creating channels to store clicks:
-        b,c,d,h,w= data.size()  # batch, channel, depth, height, width
+        b,c,d,h,w= data.size()  # batch, channel (first is image other are click), depth, height, width
         groundtruth=target[0]
 
         #get the number of labels
@@ -139,15 +140,14 @@ class interactive_nnUNetTrainer(nnUNetTrainer):
                     probabilities = torch.softmax(logits[0],dim=1)
                     _,prediction = torch.max(probabilities,dim=1)
                 for nimage in range(b): 
-                    inputs=data[nimage]
+                    
                     test = groundtruth[nimage][0] == prediction[nimage] #test matrix to find prediction's mistakes
                     misslabeled_indexes = torch.nonzero(~test) #getting indexes of misslabeled pixels
-                    misslabeled_indexes = misslabeled_indexes
                     for slice in range(d):
                         misslabeled_count = (nbr_labels)*[0]
                         mask=(misslabeled_indexes[:,0]==slice)
                         misslabeled_per_slice=misslabeled_indexes[mask].tolist()
-                        #misslabeled_per_slice= [index for index in misslabeled_indexes if index[0]==slice]
+                        
                         
                         for i in misslabeled_per_slice:
                             label=groundtruth[(nimage,0)+tuple(i)]
@@ -164,13 +164,8 @@ class interactive_nnUNetTrainer(nnUNetTrainer):
 
                         #simulation du clique ici
                         breakpoint()
-                        potential_click=torch.nonzero(prediction[nimage] == torch.full(tuple(prediction[nimage].size()),chosen_label,device=self.device))
-                        #filterting to be on the good slice
-                        mask=(potential_click[:,0]==slice) 
-                        potential_click=potential_click[mask]
-                        #filtering to keep only misslabeled pixels
-                        common_mask = (potential_click[:, None] == misslabeled_indexes).all(-1).any(-1)
-                        potential_click=potential_click[common_mask]
+                        mask=(groundtruth[nimage,0,slice]==chosen_label) & (~test[slice])
+                        potential_click = torch.nonzero(mask)
                         # D={}
                         # for coordinate in potential_click:
                         #     D[coordinate]=probabilities[tuple(coordinate)]
@@ -180,13 +175,21 @@ class interactive_nnUNetTrainer(nnUNetTrainer):
                         #     if coordinate[1] == max_value:
                         #         final_list.append(coordinate[0])
                         # click = np.random.choice(final_list)
-                        click=potential_click[np.random.randint(0,len(potential_click)-1)]
-                        data[((nimage,chosen_label+1)+tuple(click))] = 1
+                        try:
+                            click=potential_click[np.random.randint(0,len(potential_click)-1)]
+                            data[((nimage,chosen_label+1,slice)+tuple(click))] = 1
+                        except :
+                            if len(potential_click) == 0:
+                                print('potential_click is empty')
                        
             else:
                 break
-            #here we smoothed the click data
-                ...
+            #here we smoothed the click data with gaussian filter
+            kernel_size=(3,3)
+            sigma=(2,2)
+            for channel in range(1,c):
+                data[:,channel,:]=data[:,c,:]=F.gaussian_blur(data[:,channel,:],kernel_size,sigma)
+        
         print("clicks generated, starting batch training...")
         self.network.train() #putting the model back to training mode 
 
