@@ -10,7 +10,6 @@ import torchvision.transforms.functional as F
 
 import nnunetv2.training.nnUNetTrainer.nnUNetTrainer as nnUNetTrainer
 from nnunetv2.utilities.helpers import dummy_context
-from nnunetv2.inference.export_prediction import convert_predicted_logits_to_segmentation_with_correct_shape
 
 import batchgenerators.utilities.file_and_folder_operations as ffops
 import nnunet.training.network_training.nnUNetTrainerV2 as trainerV2
@@ -112,7 +111,6 @@ class interactive_nnUNetTrainer(nnUNetTrainer):
             target = [i.to(self.device, non_blocking=True) for i in target]
         else:
             target = target.to(self.device, non_blocking=True)
-        
         #Part where we are going to simulate clicks:
         #starting by creating channels to store clicks:
         b,c,d,h,w= data.size()  # batch, channel, depth, height, width
@@ -124,6 +122,10 @@ class interactive_nnUNetTrainer(nnUNetTrainer):
             nbr_labels=len(self.dataset_json['labels'])-1 #-1 because we don't count the ignore label
         else:
             nbr_labels=len(self.dataset_json['labels'])
+        
+        #click channel are potentialy noised by the preprocessing we need to fix that : 
+        if data[:,1:nbr_labels+1].sum()!=0:
+            data[:,1:nbr_labels+1]=torch.full((b,c-1,d,h,w),0,device=self.device,dtype=torch.int)
 
         #function to decide if we simulate the k-th click
         def do_simulate(k,N):
@@ -153,17 +155,17 @@ class interactive_nnUNetTrainer(nnUNetTrainer):
                         slice_indices=misslabeled_per_slice[:,0]
                         h_indices=misslabeled_per_slice[:,1]
                         w_indices=misslabeled_per_slice[:,2]
-                        B=groundtruth[nimage,0][slice_indices,h_indices,w_indices]
+                        true_value=groundtruth[nimage,0][slice_indices,h_indices,w_indices]
 
                         #getting the worst prediction label
-                        label_list,misslabeled_count=B.unique(return_counts=True)
+                        label_list,misslabeled_count=true_value.unique(return_counts=True)
                         if len(misslabeled_count)==0: #when the network does 0 mistake 
                             print('no misslabeled pixel (perfect prediction)')
                             continue
                         else:
                             max_value=torch.max(misslabeled_count).item()
                             worst_labels=(misslabeled_count==max_value).nonzero(as_tuple=False)
-                            chosen_label=label_list[worst_labels][np.random.randint(len(worst_labels))].item()
+                            chosen_label=int(label_list[worst_labels][np.random.randint(len(worst_labels))].item())
         
                             #simulation du clique ici
                             mask=(groundtruth[nimage,0,slice]==chosen_label) & (~test[slice])
@@ -177,10 +179,14 @@ class interactive_nnUNetTrainer(nnUNetTrainer):
                         #     if coordinate[1] == max_value:
                         #         final_list.append(coordinate[0])
                         # click = np.random.choice(final_list)
-                            try:                        
-                                click=potential_click[np.random.randint(len(potential_click))]
-                            except:
-                                breakpoint()
+                         #TODO: choose click with respect to probabilites of prediction
+                            # breakpoint()
+                            # h_likely=potential_click[:,0]
+                            # w_likely=potential_click[:,1]
+                            # more_likely=probabilities[nimage,0,slice,h_likely,w_likely]  
+                            # max_proba=torch.max(more_likely)
+                                                                          
+                            click=potential_click[np.random.randint(len(potential_click))]                            
                             data[((nimage,chosen_label+1,slice)+tuple(click))] = 1
                        
             else:
@@ -189,7 +195,7 @@ class interactive_nnUNetTrainer(nnUNetTrainer):
             # kernel_size=(3,3)
             # sigma=(2,2)
             # for channel in range(1,c):
-            #     data[:,channel,:]=F.gaussian_blur(data[:,channel,:],kernel_size,sigma)
+            #     data[:,channel]=F.gaussian_blur(data[:,channel],kernel_size,sigma)
         print("clicks generated, starting batch training...")
         self.network.train() #putting the model back to training mode 
 
