@@ -163,7 +163,7 @@ class interactive_nnUNetTrainer(nnUNetTrainer):
                         else:
                             max_value=torch.max(misslabeled_count).item()
                             worst_labels=(misslabeled_count==max_value).nonzero(as_tuple=False)
-                            chosen_label=worst_labels[np.random.randint(len(worst_labels))].item()
+                            chosen_label=label_list[worst_labels][np.random.randint(len(worst_labels))].item()
         
                             #simulation du clique ici
                             mask=(groundtruth[nimage,0,slice]==chosen_label) & (~test[slice])
