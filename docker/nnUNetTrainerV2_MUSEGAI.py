@@ -99,7 +99,7 @@ class interactive_nnUNetTrainer(nnUNetTrainer):
             device,
             )
 
-            self.max_iter = 5#max_iter # maximal number of click during an iteration of training
+            self.max_iter = 2#max_iter # maximal number of click during an iteration of training
             self.nbr_supervised = 0.5#nbr_supervised  # number of image that are trained with clicks
             self.dataset_json = dataset_json #info on the dataset -> maybe not useful
             
@@ -115,7 +115,7 @@ class interactive_nnUNetTrainer(nnUNetTrainer):
         
         #Part where we are going to simulate clicks:
         #starting by creating channels to store clicks:
-        b,c,d,h,w= data.size()  # batch, channel (first is image other are click), depth, height, width
+        b,c,d,h,w= data.size()  # batch, channel, depth, height, width
         groundtruth=target[0]
 
         #get the number of labels
@@ -139,33 +139,35 @@ class interactive_nnUNetTrainer(nnUNetTrainer):
                     logits = self.network(data)
                     probabilities = torch.softmax(logits[0],dim=1)
                     _,prediction = torch.max(probabilities,dim=1)
-                for nimage in range(b): 
+                for nimage in range(b):
                     
                     test = groundtruth[nimage][0] == prediction[nimage] #test matrix to find prediction's mistakes
-                    misslabeled_indexes = torch.nonzero(~test) #getting indexes of misslabeled pixels
+                    misslabeled_indices = torch.nonzero(~test) #getting indexes of misslabeled pixels
+                    
                     for slice in range(d):
-                        misslabeled_count = (nbr_labels)*[0]
-                        mask=(misslabeled_indexes[:,0]==slice)
-                        misslabeled_per_slice=misslabeled_indexes[mask].tolist()
-                        
-                        
-                        for i in misslabeled_per_slice:
-                            label=groundtruth[(nimage,0)+tuple(i)]
-                            misslabeled_count[int(label.item())]+=1     
-                        #getting the worst predicted label
-                        
-                        max_value = max(misslabeled_count)
-                        worst_labels = [i for i, x in enumerate(misslabeled_count) if x == max_value]
-                        if len(worst_labels) != 1:
-                            #if there is more than one label, we pick one randomly
-                            chosen_label = np.random.choice(worst_labels)
-                        else:
-                            chosen_label = worst_labels[0]
+                        #filtering by slice                        
+                        mask=(misslabeled_indices[:,0]==slice)
+                        misslabeled_per_slice=misslabeled_indices[mask]
 
-                        #simulation du clique ici
-                        breakpoint()
-                        mask=(groundtruth[nimage,0,slice]==chosen_label) & (~test[slice])
-                        potential_click = torch.nonzero(mask)
+                        #getting gt value of all wrongly predicted pixels
+                        slice_indices=misslabeled_per_slice[:,0]
+                        h_indices=misslabeled_per_slice[:,1]
+                        w_indices=misslabeled_per_slice[:,2]
+                        B=groundtruth[nimage,0][slice_indices,h_indices,w_indices]
+
+                        #getting the worst prediction label
+                        label_list,misslabeled_count=B.unique(return_counts=True)
+                        if len(misslabeled_count)==0: #when the network does 0 mistake 
+                            print('no misslabeled pixel (perfect prediction)')
+                            continue
+                        else:
+                            max_value=torch.max(misslabeled_count).item()
+                            worst_labels=(misslabeled_count==max_value).nonzero(as_tuple=False)
+                            chosen_label=worst_labels[np.random.randint(len(worst_labels))].item()
+        
+                            #simulation du clique ici
+                            mask=(groundtruth[nimage,0,slice]==chosen_label) & (~test[slice])
+                            potential_click = torch.nonzero(mask)
                         # D={}
                         # for coordinate in potential_click:
                         #     D[coordinate]=probabilities[tuple(coordinate)]
@@ -175,21 +177,19 @@ class interactive_nnUNetTrainer(nnUNetTrainer):
                         #     if coordinate[1] == max_value:
                         #         final_list.append(coordinate[0])
                         # click = np.random.choice(final_list)
-                        try:
-                            click=potential_click[np.random.randint(0,len(potential_click)-1)]
+                            try:                        
+                                click=potential_click[np.random.randint(len(potential_click))]
+                            except:
+                                breakpoint()
                             data[((nimage,chosen_label+1,slice)+tuple(click))] = 1
-                        except :
-                            if len(potential_click) == 0:
-                                print('potential_click is empty')
                        
             else:
                 break
-            #here we smoothed the click data with gaussian filter
-            kernel_size=(3,3)
-            sigma=(2,2)
-            for channel in range(1,c):
-                data[:,channel,:]=data[:,c,:]=F.gaussian_blur(data[:,channel,:],kernel_size,sigma)
-        
+            #here we smoothed the click data
+            # kernel_size=(3,3)
+            # sigma=(2,2)
+            # for channel in range(1,c):
+            #     data[:,channel,:]=F.gaussian_blur(data[:,channel,:],kernel_size,sigma)
         print("clicks generated, starting batch training...")
         self.network.train() #putting the model back to training mode 
 
