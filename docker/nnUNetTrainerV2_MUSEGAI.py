@@ -76,7 +76,7 @@ class nnUNetTrainerV2_MUSEGAI(trainerV2.nnUNetTrainerV2):
             ignore_label=plans["num_classes"],
         )
 
-class interactive_nnUNetTrainer(nnUNetTrainer):
+class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
     """custom nnUNet Trainer that train also for interactive segmentation and prediction refinement"""
 
     def __init__(self, 
@@ -131,73 +131,74 @@ class interactive_nnUNetTrainer(nnUNetTrainer):
         def do_simulate(k,N):
             return np.random.binomial(n=1,p=1-k/N)
         
-        self.network.eval() #putting the model in inference mode, needed to simulate click
+        if np.random.binomial(n=1,p=self.nbr_supervised): #choosing if the batch is gonna be train with clicks or not
+            self.network.eval() #putting the model in inference mode, needed to simulate click
+                
+            for k in range(self.max_iter):
+            #we first want to get map probabilities
+                if do_simulate(k,self.max_iter):
+                    # using current network to have prediction & probabilities 
+                    with torch.no_grad(): 
+                        logits = self.network(data)
+                        probabilities = torch.softmax(logits[0],dim=1)
+                        _,prediction = torch.max(probabilities,dim=1)
+                    for nimage in range(b):
+                        
+                        test = groundtruth[nimage][0] == prediction[nimage] #test matrix to find prediction's mistakes
+                        misslabeled_indices = torch.nonzero(~test) #getting indexes of misslabeled pixels
+                        
+                        for slice in range(d):
+                            #filtering by slice                        
+                            mask=(misslabeled_indices[:,0]==slice)
+                            misslabeled_per_slice=misslabeled_indices[mask]
+
+                            #getting gt value of all wrongly predicted pixels
+                            slice_indices=misslabeled_per_slice[:,0]
+                            h_indices=misslabeled_per_slice[:,1]
+                            w_indices=misslabeled_per_slice[:,2]
+                            true_value=groundtruth[nimage,0][slice_indices,h_indices,w_indices]
+
+                            #getting the worst prediction label
+                            label_list,misslabeled_count=true_value.unique(return_counts=True)
+                            if len(misslabeled_count)==0: #when the network does 0 mistake 
+                                print('no misslabeled pixel (perfect prediction)')
+                                continue
+                            else:
+                                max_value=torch.max(misslabeled_count).item()
+                                worst_labels=(misslabeled_count==max_value).nonzero(as_tuple=False)
+                                chosen_label=int(label_list[worst_labels][np.random.randint(len(worst_labels))].item())
             
-        for k in range(self.max_iter):
-        #we first want to get map probabilities
-            if do_simulate(k,self.max_iter):
-                # using current network to have prediction & probabilities 
-                with torch.no_grad(): 
-                    logits = self.network(data)
-                    probabilities = torch.softmax(logits[0],dim=1)
-                    _,prediction = torch.max(probabilities,dim=1)
-                for nimage in range(b):
-                    
-                    test = groundtruth[nimage][0] == prediction[nimage] #test matrix to find prediction's mistakes
-                    misslabeled_indices = torch.nonzero(~test) #getting indexes of misslabeled pixels
-                    
-                    for slice in range(d):
-                        #filtering by slice                        
-                        mask=(misslabeled_indices[:,0]==slice)
-                        misslabeled_per_slice=misslabeled_indices[mask]
-
-                        #getting gt value of all wrongly predicted pixels
-                        slice_indices=misslabeled_per_slice[:,0]
-                        h_indices=misslabeled_per_slice[:,1]
-                        w_indices=misslabeled_per_slice[:,2]
-                        true_value=groundtruth[nimage,0][slice_indices,h_indices,w_indices]
-
-                        #getting the worst prediction label
-                        label_list,misslabeled_count=true_value.unique(return_counts=True)
-                        if len(misslabeled_count)==0: #when the network does 0 mistake 
-                            print('no misslabeled pixel (perfect prediction)')
-                            continue
-                        else:
-                            max_value=torch.max(misslabeled_count).item()
-                            worst_labels=(misslabeled_count==max_value).nonzero(as_tuple=False)
-                            chosen_label=int(label_list[worst_labels][np.random.randint(len(worst_labels))].item())
-        
-                            #simulation du clique ici
-                            mask=(groundtruth[nimage,0,slice]==chosen_label) & (~test[slice])
-                            potential_click = torch.nonzero(mask)
-                        # D={}
-                        # for coordinate in potential_click:
-                        #     D[coordinate]=probabilities[tuple(coordinate)]
-                        # max_value = max(D.values)
-                        # final_list=[]
-                        # for coordinate in D.items():
-                        #     if coordinate[1] == max_value:
-                        #         final_list.append(coordinate[0])
-                        # click = np.random.choice(final_list)
-                         #TODO: choose click with respect to probabilites of prediction
-                            # breakpoint()
-                            # h_likely=potential_click[:,0]
-                            # w_likely=potential_click[:,1]
-                            # more_likely=probabilities[nimage,0,slice,h_likely,w_likely]  
-                            # max_proba=torch.max(more_likely)
-                                                                          
-                            click=potential_click[np.random.randint(len(potential_click))]                            
-                            data[((nimage,chosen_label+1,slice)+tuple(click))] = 1
-                       
-            else:
-                break
-        #here we smoothed the click data
-        kernel_size=(3,3)
-        sigma=(2,2)
-        for channel in range(1,c):
-            data[:,channel]=F.gaussian_blur(data[:,channel],kernel_size,sigma)
-        print("clicks generated, starting batch training...")
-        self.network.train() #putting the model back to training mode 
+                                #simulation du clique ici
+                                mask=(groundtruth[nimage,0,slice]==chosen_label) & (~test[slice])
+                                potential_click = torch.nonzero(mask)
+                            # D={}
+                            # for coordinate in potential_click:
+                            #     D[coordinate]=probabilities[tuple(coordinate)]
+                            # max_value = max(D.values)
+                            # final_list=[]
+                            # for coordinate in D.items():
+                            #     if coordinate[1] == max_value:
+                            #         final_list.append(coordinate[0])
+                            # click = np.random.choice(final_list)
+                            #TODO: choose click with respect to probabilites of prediction
+                                # breakpoint()
+                                # h_likely=potential_click[:,0]
+                                # w_likely=potential_click[:,1]
+                                # more_likely=probabilities[nimage,0,slice,h_likely,w_likely]  
+                                # max_proba=torch.max(more_likely)
+                                                                            
+                                click=potential_click[np.random.randint(len(potential_click))]                            
+                                data[((nimage,chosen_label+1,slice)+tuple(click))] = 1
+                        
+                else:
+                    break
+            #here we smoothed the click data
+            kernel_size=(3,3)
+            sigma=(2,2)
+            for channel in range(1,c):
+                data[:,channel]=F.gaussian_blur(data[:,channel],kernel_size,sigma)
+            print("clicks generated, starting batch training...")
+            self.network.train() #putting the model back to training mode 
 
         self.optimizer.zero_grad(set_to_none=True)
         # Autocast can be annoying
