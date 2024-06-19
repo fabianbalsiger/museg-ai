@@ -191,11 +191,11 @@ class interactive_nnUNetTrainer(nnUNetTrainer):
                        
             else:
                 break
-            #here we smoothed the click data
-            # kernel_size=(3,3)
-            # sigma=(2,2)
-            # for channel in range(1,c):
-            #     data[:,channel]=F.gaussian_blur(data[:,channel],kernel_size,sigma)
+        #here we smoothed the click data
+        kernel_size=(3,3)
+        sigma=(2,2)
+        for channel in range(1,c):
+            data[:,channel]=F.gaussian_blur(data[:,channel],kernel_size,sigma)
         print("clicks generated, starting batch training...")
         self.network.train() #putting the model back to training mode 
 
