@@ -19,7 +19,7 @@ LOGGER = logging.getLogger(__name__)
 """
 
 
-def train(model, images, rois, labels, outdir, *, split_axis=None, train_model=True, make_dockerfile=True, folds=(0, 1, 2, 3, 4), nepoch=250, preprocess=True, random_pruning=True):
+def train(model, images, rois, labels, outdir, *, split_axis=None, train_model=True, make_dockerfile=True, folds=(0, 1, 2, 3, 4), nepoch=250, preprocess=True, random_pruning=True, continue_training=False):
     """train new model on provided datasets
 
     Args
@@ -181,7 +181,7 @@ def train(model, images, rois, labels, outdir, *, split_axis=None, train_model=T
     if train_model:
         # run nnU-net training
         LOGGER.info(f"Run nnU-net training")
-        dockerutils.run_training(model, outdir, nepoch=nepoch, folds=folds, preprocess=preprocess)
+        dockerutils.run_training(model, outdir, nepoch=nepoch, folds=folds, preprocess=preprocess, continue_training=continue_training)
 
     if make_dockerfile:
         LOGGER.info(f"\nGenerate dockerfile for model {model}")

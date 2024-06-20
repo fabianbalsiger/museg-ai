@@ -159,8 +159,9 @@ def infer(images, dest, filename, format, model, side, tempdir, verbose, overwri
 @click.option("--folds", help="specify fold numbers to train as tuple")
 @click.option("--nepoch", type=click.Choice(['1', '10', '100', '250', '1000']), default='250', help="Number of epochs")
 @click.option("--split", is_flag=True, help="Split datasets into left and right parts")
+@click.option("--continue", "continue_training", is_flag=True, help="Continue training.")
 @click.option("-v", "--verbose", is_flag=True)
-def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, dest, split, verbose, folds, preprocess, nepoch):
+def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, dest, split, verbose, folds, preprocess, nepoch, continue_training):
     """Create new segmentation model using training images and rois"""
     if verbose:
         logging.basicConfig(level=logging.INFO)
@@ -256,7 +257,7 @@ def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, des
 
     # train model
     split_axis = None if not split else 0
-    api.train_model(model, images, rois, labelfile, dest, split_axis=split_axis, train_model=train, make_dockerfile=dockerfile, folds=folds, preprocess=preprocess, nepoch=nepoch)
+    api.train_model(model, images, rois, labelfile, dest, split_axis=split_axis, train_model=train, make_dockerfile=dockerfile, folds=folds, preprocess=preprocess, nepoch=nepoch, continue_training=continue_training)
 
 
 if __name__ == "__main__":

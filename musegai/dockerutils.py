@@ -77,7 +77,7 @@ def check_training():
     return True
 
 
-def run_training(model, dirname, folds=(0, 1, 2, 3, 4), nepoch=1000, preprocess=True):
+def run_training(model, dirname, folds=(0, 1, 2, 3, 4), nepoch=1000, preprocess=True,continue_training=False):
     """Run training"""
     dirname = str(pathlib.Path(dirname).resolve())
     client = docker.from_env()
@@ -110,6 +110,9 @@ def run_training(model, dirname, folds=(0, 1, 2, 3, 4), nepoch=1000, preprocess=
     opts = []
     if nepoch != 1000:
         opts.extend(['-tr', f'nnUNetTrainer_{nepoch}epochs'])
+    if continue_training:
+        print("Warning: continue training")
+        opts.extend(['--c'])
 
     # train
     # -p nnUNetResEncUNetLPlans # (M/L/XL)
