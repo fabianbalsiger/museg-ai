@@ -148,10 +148,15 @@ class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
                         misslabeled_indices = torch.nonzero(~test) #getting indexes of misslabeled pixels
                         
                         for slice in range(d):
+
+                            #checking if the current slice is not fully blank
+                            if torch.nonzero(data[nimage,0,slice]-data[nimage,0,slice,0,0]).numel==0:
+                                print('slice fully blank')
+                                continue
+
                             #filtering by slice                        
                             mask=(misslabeled_indices[:,0]==slice)
                             misslabeled_per_slice=misslabeled_indices[mask]
-
                             #getting gt value of all wrongly predicted pixels
                             slice_indices=misslabeled_per_slice[:,0]
                             h_indices=misslabeled_per_slice[:,1]
@@ -195,7 +200,7 @@ class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
             #here we smoothed the click data
             kernel_size=(3,3)
             sigma=(2,2)
-            for channel in range(1,c):
+            for channel in range(1,c+1):
                 data[:,channel]=F.gaussian_blur(data[:,channel],kernel_size,sigma)
             print("clicks generated, starting batch training...")
             self.network.train() #putting the model back to training mode 
