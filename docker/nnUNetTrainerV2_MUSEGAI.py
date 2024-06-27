@@ -176,21 +176,26 @@ class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
                                 #simulation du clique ici
                                 mask=(groundtruth[nimage,0,slice]==chosen_label) & (~test[slice])
                                 potential_click = torch.nonzero(mask)
-                            # D={}
-                            # for coordinate in potential_click:
-                            #     D[coordinate]=probabilities[tuple(coordinate)]
-                            # max_value = max(D.values)
-                            # final_list=[]
-                            # for coordinate in D.items():
-                            #     if coordinate[1] == max_value:
-                            #         final_list.append(coordinate[0])
-                            # click = np.random.choice(final_list)
+
                             #TODO: choose click with respect to probabilites of prediction
-                                # breakpoint()
-                                # h_likely=potential_click[:,0]
-                                # w_likely=potential_click[:,1]
-                                # more_likely=probabilities[nimage,0,slice,h_likely,w_likely]  
-                                # max_proba=torch.max(more_likely)
+                                def get_non_matching_element(T1, T2):
+                                    """ return all elements of T1 that are not in T2 """
+                                    return T1[~(T1.unsqueeze(1) == T2).all(-1).any(-1)]
+                                breakpoint()
+                                gt_label=torch.nonzero(groundtruth[nimage,0,slice]==chosen_label)
+                                pred_label=torch.nonzero(prediction[nimage,slice]==chosen_label)
+                                False_negative=get_non_matching_element(pred_label,gt_label)
+                                False_positive=get_non_matching_element(gt_label,pred_label)
+
+                                D_plus=torch.full((h,w),0)
+                                h_indices=False_negative[:,0]
+                                w_indices=False_negative[:,1]
+                                D_plus[h_indices,w_indices]=1
+                                D_minus=torch.full((h,w),0)
+                                h_indices=False_positive[:,0]
+                                w_indices=False_positive[:,1]
+                                D_minus[h_indices,w_indices]=1
+
                                                                             
                                 click=potential_click[np.random.randint(len(potential_click))]                            
                                 data[((nimage,chosen_label+1,slice)+tuple(click))] = 1
