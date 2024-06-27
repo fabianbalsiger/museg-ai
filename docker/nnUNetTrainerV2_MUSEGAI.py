@@ -178,34 +178,64 @@ class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
                                 potential_click = torch.nonzero(mask)
 
                             #TODO: choose click with respect to probabilites of prediction
-                                def get_non_matching_element(T1, T2):
-                                    """ return all elements of T1 that are not in T2 """
-                                    return T1[~(T1.unsqueeze(1) == T2).all(-1).any(-1)]
-                                breakpoint()
-                                gt_label=torch.nonzero(groundtruth[nimage,0,slice]==chosen_label)
-                                pred_label=torch.nonzero(prediction[nimage,slice]==chosen_label)
-                                False_negative=get_non_matching_element(pred_label,gt_label)
-                                False_positive=get_non_matching_element(gt_label,pred_label)
-
-                                D_plus=torch.full((h,w),0)
+                                def chamfer_distance_torch(T1,T2):
+                                    """return the tensor containing the distance of from T2 of each point of T1 """
+                                    return torch.min(torch.cdist(T1,T2),dim=1)[0]
+                                
+                                def dilatation(image):
+                                    """dilate the "1" part of an 2d image"""
+                                    kernel=torch.tensor([[1,1,1],[1,1,1],[1,1,1]],device=self.device).unsqueeze(0).unsqueeze(0).float()
+                                    return torch.where(torch.conv2d(image.unsqueeze(0).unsqueeze(0),kernel,padding=1)>=1,1,0).squeeze(0).squeeze(0)
+                                
+                                def get_probabilities(mask):
+                                    contour=dilatation(mask)-mask
+                                    dist=chamfer_distance_torch(torch.nonzero(mask==1).float(),torch.nonzero(contour==1).float())
+                                    return torch.exp(dist)-1
+                                                                               
+                                gt_label=(groundtruth[nimage,0,slice]==chosen_label).int()
+                                pred_label=(prediction[nimage,slice]==chosen_label).int()
+                                False_negative=torch.nonzero(torch.where(gt_label-pred_label==1,1,0))
+                                False_positive=torch.nonzero(torch.where(gt_label-pred_label==-1,1,0))
+                                D_plus=torch.full((h,w),0,device=self.device).float()
                                 h_indices=False_negative[:,0]
                                 w_indices=False_negative[:,1]
                                 D_plus[h_indices,w_indices]=1
-                                D_minus=torch.full((h,w),0)
+                                D_minus=torch.full((h,w),0,device=self.device).float()
                                 h_indices=False_positive[:,0]
                                 w_indices=False_positive[:,1]
                                 D_minus[h_indices,w_indices]=1
+                                
+                                if D_plus.sum()>=D_minus.sum():
+                                   # breakpoint()
+                                    proba_click=get_probabilities(D_plus)
+                                    potential_click=torch.nonzero(proba_click==proba_click.max())
+                                    random_pick=potential_click[np.random.randint(len(potential_click))]
+                                    click=torch.nonzero(D_plus)[random_pick].squeeze(0)
 
-                                                                            
-                                click=potential_click[np.random.randint(len(potential_click))]                            
-                                data[((nimage,chosen_label+1,slice)+tuple(click))] = 1
+                                else:
+                                  #  breakpoint()
+                                    proba_click=get_probabilities(D_minus)
+                                    potential_click=torch.nonzero(proba_click==proba_click.max())
+                                    random_pick=potential_click[np.random.randint(len(potential_click))]
+                                    click=torch.nonzero(D_minus)[random_pick].squeeze(0)
+                                    chosen_label=groundtruth[nimage,0,slice,click[0].item(),click[1].item()].int()
+
+                                 
+                                
+                                #adding click into data
+                                
+                                try:
+                                    data[nimage,chosen_label+1,slice,click[0],click[1]] = 1
+                                except:
+                                    print(f"click:{click}")
+                                    breakpoint()
                         
                 else:
                     break
             #here we smoothed the click data
             kernel_size=(3,3)
             sigma=(2,2)
-            for channel in range(1,c+1):
+            for channel in range(1,c):
                 data[:,channel]=F.gaussian_blur(data[:,channel],kernel_size,sigma)
             print("clicks generated, starting batch training...")
             self.network.train() #putting the model back to training mode 
