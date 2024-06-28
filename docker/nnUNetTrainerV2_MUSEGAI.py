@@ -177,7 +177,7 @@ class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
                                 mask=(groundtruth[nimage,0,slice]==chosen_label) & (~test[slice])
                                 potential_click = torch.nonzero(mask)
 
-                            #TODO: choose click with respect to probabilites of prediction
+                             # choose click with respect to a posteriori probabilites 
                                 def chamfer_distance_torch(T1,T2):
                                     """return the tensor containing the distance of from T2 of each point of T1 """
                                     return torch.min(torch.cdist(T1,T2),dim=1)[0]
@@ -188,48 +188,45 @@ class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
                                     return torch.where(torch.conv2d(image.unsqueeze(0).unsqueeze(0),kernel,padding=1)>=1,1,0).squeeze(0).squeeze(0)
                                 
                                 def get_probabilities(mask):
+                                    """compute chmafer distance and transform into probability map (up to a factor)"""
                                     contour=dilatation(mask)-mask
                                     dist=chamfer_distance_torch(torch.nonzero(mask==1).float(),torch.nonzero(contour==1).float())
                                     return torch.exp(dist)-1
-                                                                               
+
+                                #filtering groundtruh and prediction to work only where there is the good label                                               
                                 gt_label=(groundtruth[nimage,0,slice]==chosen_label).int()
                                 pred_label=(prediction[nimage,slice]==chosen_label).int()
+                                #computing False negative and False positive masks
                                 False_negative=torch.nonzero(torch.where(gt_label-pred_label==1,1,0))
                                 False_positive=torch.nonzero(torch.where(gt_label-pred_label==-1,1,0))
-                                D_plus=torch.full((h,w),0,device=self.device).float()
+                                D_plus=torch.full((h,w),0,device=self.device).float() #False_negative map
                                 h_indices=False_negative[:,0]
                                 w_indices=False_negative[:,1]
                                 D_plus[h_indices,w_indices]=1
-                                D_minus=torch.full((h,w),0,device=self.device).float()
+                                D_minus=torch.full((h,w),0,device=self.device).float() #False_positive map 
                                 h_indices=False_positive[:,0]
                                 w_indices=False_positive[:,1]
                                 D_minus[h_indices,w_indices]=1
                                 
-                                if D_plus.sum()>=D_minus.sum():
-                                   # breakpoint()
+                                #Computing chamfer distance to get probabilities for choosing click's index
+                                if D_plus.sum()>=D_minus.sum(): #if we have more False negative we correct one of them
+                                   
                                     proba_click=get_probabilities(D_plus)
                                     potential_click=torch.nonzero(proba_click==proba_click.max())
                                     random_pick=potential_click[np.random.randint(len(potential_click))]
                                     click=torch.nonzero(D_plus)[random_pick].squeeze(0)
 
                                 else:
-                                  #  breakpoint()
+                                  
                                     proba_click=get_probabilities(D_minus)
                                     potential_click=torch.nonzero(proba_click==proba_click.max())
                                     random_pick=potential_click[np.random.randint(len(potential_click))]
                                     click=torch.nonzero(D_minus)[random_pick].squeeze(0)
                                     chosen_label=groundtruth[nimage,0,slice,click[0].item(),click[1].item()].int()
-
-                                 
-                                
-                                #adding click into data
-                                
-                                try:
-                                    data[nimage,chosen_label+1,slice,click[0],click[1]] = 1
-                                except:
-                                    print(f"click:{click}")
-                                    breakpoint()
-                        
+                               
+                                #adding click into data                                                              
+                                data[nimage,chosen_label+1,slice,click[0],click[1]] = 1
+                                                      
                 else:
                     break
             #here we smoothed the click data
