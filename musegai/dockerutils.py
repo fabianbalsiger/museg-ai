@@ -36,7 +36,7 @@ def get_model_info(model):
             if f"{model}" == image.tags[0]:
                 model_info[image.tags[0]] = image.labels
         except IndexError:
-            pass        
+            pass
     return model_info[model]
     # return [
     #     f"fabianbalsiger/museg:thigh-model3",

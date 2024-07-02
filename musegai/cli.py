@@ -16,11 +16,11 @@ def cli(): ...
 
 
 @cli.command(context_settings={"show_default": True})
+@click.argument("model")
 @click.argument("images", nargs=-1)
 @click.option("-d", "--dest", type=click.Path(), help="Output directory.")
 @click.option("--filename", default="roi", help="Segmentation filename.")
 @click.option("-f", "--format", default=".nii.gz", type=click.Choice([".nii.gz", ".mha", ".mhd", ".hdr"]))
-@click.option("--model", default="thigh-model3", help="Specify the segmentation model.")
 @click.option("--side", default="LR", type=click.Choice(["L", "R", "LR", "NA"]), help="Limb's side(s) in image")
 @click.option("-v", "--verbose", is_flag=True, help="Show more information")
 @click.option("--tempdir", type=click.Path(exists=True), help="Location for temporary files.")
@@ -55,7 +55,7 @@ def infer(images, dest, filename, format, model, side, tempdir, verbose, overwri
         nchannel = int(model_info["nchannel"])
     
     if 1 < len(images) != nchannel:
-        click.echo(f"Expecting {nchannel} channels, got {len(images)} expression.")
+        click.echo(f"Expecting {nchannel} channels, got {len(images)} expression(s).")
         sys.exit(1)
 
     image_files = []
