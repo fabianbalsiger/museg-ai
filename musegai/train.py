@@ -19,7 +19,22 @@ LOGGER = logging.getLogger(__name__)
 """
 
 
-def train(model, images, rois, labels, outdir, *, split_axis=None, train_model=True, make_dockerfile=True, folds=(0, 1, 2, 3, 4), nepoch=250, preprocess=True, random_pruning=True, continue_training=False):
+def train(
+    model,
+    images,
+    rois,
+    labels,
+    outdir,
+    *,
+    split_axis=None,
+    train_model=True,
+    make_dockerfile=True,
+    folds=(0, 1, 2, 3, 4),
+    nepoch=250,
+    preprocess=True,
+    random_pruning=True,
+    continue_training=False,
+):
     """train new model on provided datasets
 
     Args
@@ -63,10 +78,10 @@ def train(model, images, rois, labels, outdir, *, split_axis=None, train_model=T
         splits = [descr.rsplit("_", 1) for descr in labels.descriptions]
         labels.descriptions = [split[0] if split[-1].upper() in ["L", "R"] else descr for split, descr in zip(splits, labels.descriptions)]
     # set 0 as background
-    labels.descriptions[0] = 'background'
+    labels.descriptions[0] = "background"
     # add ignore label
-    labels.append('ignore', color=(255, 0, 0), visibility=0)
-    ignore_label = labels['ignore']
+    labels.append("ignore", color=(255, 0, 0), visibility=0)
+    ignore_label = labels["ignore"]
     # remap index values
     uniquelabels = set(labels.descriptions)
     labelset = set(labels[name] for name in uniquelabels)
@@ -77,7 +92,7 @@ def train(model, images, rois, labels, outdir, *, split_axis=None, train_model=T
 
     # random state
     rstate = np.random.RandomState(0)
-    
+
     if train_model and preprocess:
         LOGGER.info(f"Start training (num. images: {nimage}, num. channels: {nchannel})")
 
@@ -110,7 +125,7 @@ def train(model, images, rois, labels, outdir, *, split_axis=None, train_model=T
                 # remove slices at the bottom
                 nprune = rstate.randint(0, np.argmin(empty_slices) + 1)
                 if nprune:
-                    LOGGER.info(f'Pruning {nprune} slices at the bottom of the volume')
+                    LOGGER.info(f"Pruning {nprune} slices at the bottom of the volume")
                     labelmap.array = labelmap.array[:, :, nprune:]
 
             # check labels
@@ -119,7 +134,7 @@ def train(model, images, rois, labels, outdir, *, split_axis=None, train_model=T
                 raise ValueError(f"Inconsistent label values in dataset {index + 1}: {_labelset} not included in {labelset}.")
             elif set(_labelset) != labelset:
                 diff = [labels[i] for i in (set(_labelset) - labelset)]
-                print(f'Warning, in dataset {index + 1}, some labels are missing: {diff}')
+                print(f"Warning, in dataset {index + 1}, some labels are missing: {diff}")
 
             # remap labelmap (remove duplicate label names, make labels consecutive)
             labelmap.array = labelremap[labelmap.array]
@@ -172,8 +187,8 @@ def train(model, images, rois, labels, outdir, *, split_axis=None, train_model=T
             json.dump(meta, fp)
 
         # store label file
-        if 'ignore' in labels.descriptions:
-            labels = labels.remove('ignore')
+        if "ignore" in labels.descriptions:
+            labels = labels.remove("ignore")
         io.save_labels(outdir / "labels.txt", labels)
 
         LOGGER.info(f"Done copying training data (num. training: {num})")

@@ -1,4 +1,5 @@
 """Custom nnU-Net trainer allowing to ignore unsegmented image slices in a volume when computing the loss."""
+
 from __future__ import annotations
 
 import SimpleITK as sitk
@@ -16,6 +17,8 @@ from nnunet.training.loss_functions.dice_loss import DC_and_CE_loss
 import nnunetv2.training.nnUNetTrainer.nnUNetTrainer as nnUNetTrainer
 import nnunetv2.inference.predict_from_raw_data as nnUNetPredict
 from nnunetv2.utilities.helpers import dummy_context
+
+
 class DC_and_CE_loss_improved(DC_and_CE_loss):
     """Wrapper of the DC_and_CE_loss that does return 0 instead of NaN when the target only consists of the ignored label.
 
@@ -75,110 +78,110 @@ class nnUNetTrainerV2_MUSEGAI(trainerV2.nnUNetTrainerV2):
             ignore_label=plans["num_classes"],
         )
 
+
 class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
     """custom nnUNet Trainer that train also for interactive segmentation and prediction refinement"""
 
-    def __init__(self, 
-                plans: dict, 
-                configuration: str, 
-                fold: int, 
-                dataset_json: dict,
-                unpack_dataset: bool = True,
-                device: torch.device = device('cuda'),
-                max_iter=5, 
-                nbr_supervised=0.5,
-            ):
-            """Initialize the nnU-Net trainer for muscle segmentation."""
-            super().__init__(plans,
+    def __init__(
+        self,
+        plans: dict,
+        configuration: str,
+        fold: int,
+        dataset_json: dict,
+        unpack_dataset: bool = True,
+        device: torch.device = device("cuda"),
+        max_iter=5,
+        nbr_supervised=0.5,
+    ):
+        """Initialize the nnU-Net trainer for muscle segmentation."""
+        super().__init__(
+            plans,
             configuration,
             fold,
             dataset_json,
             unpack_dataset,
             device,
-            )
-            self.max_iter = max_iter # maximal number of click during an iteration of training
-            self.nbr_supervised = nbr_supervised  # number of image that are trained with clicks
-            self.dataset_json = dataset_json #info on the dataset -> maybe not useful
-            
+        )
+        self.max_iter = max_iter  # maximal number of click during an iteration of training
+        self.nbr_supervised = nbr_supervised  # number of image that are trained with clicks
+        self.dataset_json = dataset_json  # info on the dataset -> maybe not useful
 
     def train_step(self, batch: dict) -> dict:
-        data = batch['data']
-        target = batch['target']
+        data = batch["data"]
+        target = batch["target"]
 
         data = data.to(self.device, non_blocking=True)
         if isinstance(target, list):
             target = [i.to(self.device, non_blocking=True) for i in target]
         else:
             target = target.to(self.device, non_blocking=True)
-        
-        #Part where we are going to simulate clicks:
-        #starting by creating channels to store clicks:
 
-        h,w,d=sitk.getsize(data[0])
+        # Part where we are going to simulate clicks:
+        # starting by creating channels to store clicks:
 
-        #get the number of labels
+        h, w, d = sitk.getsize(data[0])
 
-        #label_dict=json.load(open('dataset.json','r'))
-        nbr_labels=len(self.dataset_json['labels'])-1 #-1 because we don't count the background label 
+        # get the number of labels
 
-        background_T=sitk.Image((h,w,d),sitk.sitkFloat32)
-        foreground_T=sitk.Image((h,w,d*nbr_labels),sitk.sitkFloat32)
+        # label_dict=json.load(open('dataset.json','r'))
+        nbr_labels = len(self.dataset_json["labels"]) - 1  # -1 because we don't count the background label
 
-        #function to decide if we simulate the k-th click
-        def do_simulate(k,N):
-            return np.random.binomial(n=1,p=1-k/N)
-        
-        temp_model=nnUNetPredict.nnUNetPrecidctor()
-        temp_model.initialize_from_trained_model_folder(outdir) #ou est outdir ???
+        background_T = sitk.Image((h, w, d), sitk.sitkFloat32)
+        foreground_T = sitk.Image((h, w, d * nbr_labels), sitk.sitkFloat32)
 
-        for image, groundtruth in zip(data,target):
-            inputs=np.concatenate((image,foreground_T,background_T),axis=0)
+        # function to decide if we simulate the k-th click
+        def do_simulate(k, N):
+            return np.random.binomial(n=1, p=1 - k / N)
+
+        temp_model = nnUNetPredict.nnUNetPrecidctor()
+        temp_model.initialize_from_trained_model_folder(outdir)  # ou est outdir ???
+
+        for image, groundtruth in zip(data, target):
+            inputs = np.concatenate((image, foreground_T, background_T), axis=0)
             for k in range(self.max_iter):
-            #we first want to get map probabilities
-                if do_simulate(k,self.max_iter):
-                    #calcul des probas ici 
-                    prediction,probabilities = temp_model.predict_single_npy_array(inputs,images_properties={'spacing':...},save_or_return_probabilities=True)
-                    test = groundtruth == prediction #test matrix to find prediction's mistakes
-                    misslabeled_index = np.argwhere(~test) #getting indexes of misslabeled pixels
+                # we first want to get map probabilities
+                if do_simulate(k, self.max_iter):
+                    # calcul des probas ici
+                    prediction, probabilities = temp_model.predict_single_npy_array(inputs, images_properties={"spacing": ...}, save_or_return_probabilities=True)
+                    test = groundtruth == prediction  # test matrix to find prediction's mistakes
+                    misslabeled_index = np.argwhere(~test)  # getting indexes of misslabeled pixels
                     for slice in range(d):
-                        misslabeled_count = nbr_labels*[0]
-                        for i in [index for index in misslabeled_index if index[0]==d]:
-                            label=groundtruth[tuple(i)]
-                            misslabeled_count[label]+=1     
+                        misslabeled_count = nbr_labels * [0]
+                        for i in [index for index in misslabeled_index if index[0] == d]:
+                            label = groundtruth[tuple(i)]
+                            misslabeled_count[label] += 1
 
-                    #getting the worst predicted label
+                    # getting the worst predicted label
                     max_value = max(misslabeled_count)
                     worst_labels = [i for i, x in enumerate(misslabeled_count) if x == max_value]
                     if len(worst_labels) != 1:
-                        #if there is more than one label, we pick one randomly
+                        # if there is more than one label, we pick one randomly
                         chosen_label = np.random.choice(worst_labels)
                     else:
                         chosen_label = worst_labels[0]
-                    #simulation du clique ici
-                    potential_click=[index for index in misslabeled_index if groundtruth[tuple(index)]==chosen_label and index[0]==d]
-                    D={}
+                    # simulation du clique ici
+                    potential_click = [index for index in misslabeled_index if groundtruth[tuple(index)] == chosen_label and index[0] == d]
+                    D = {}
                     for coordinate in potential_click:
-                        D[coordinate]=probabilities[tuple(coordinate)]
+                        D[coordinate] = probabilities[tuple(coordinate)]
                     max_value = max(D.values)
-                    final_list=[]
+                    final_list = []
                     for coordinate in D.items():
                         if coordinate[1] == max_value:
                             final_list.append(coordinate[0])
-                    click = np.random.choice(final_list)    
-                    inputs[tuple(click)] = 1 #a changer si on change les tenseurs foreground et background
+                    click = np.random.choice(final_list)
+                    inputs[tuple(click)] = 1  # a changer si on change les tenseurs foreground et background
                 else:
                     break
-                #writing the simulation for optimisation...
+                # writing the simulation for optimisation...
                 data[data.index(image)] = inputs
-
-
 
         self.optimizer.zero_grad(set_to_none=True)
         # Autocast can be annoying
         # If the device_type is 'cpu' then it's slow as heck and needs to be disabled.
         # If the device_type is 'mps' then it will complain that mps is not implemented, even if enabled=False is set. Whyyyyyyy. (this is why we don't make use of enabled=False)
         # So autocast will only be active if we have a cuda device.
-        with autocast(self.device.type, enabled=True) if self.device.type == 'cuda' else dummy_context():
+        with autocast(self.device.type, enabled=True) if self.device.type == "cuda" else dummy_context():
             output = self.network(data)
             # del data
             l = self.loss(output, target)
@@ -193,4 +196,4 @@ class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
             l.backward()
             nn.utils.clip_grad_norm_(self.network.parameters(), 12)
             self.optimizer.step()
-        return {'loss': l.detach().cpu().numpy()}
+        return {"loss": l.detach().cpu().numpy()}

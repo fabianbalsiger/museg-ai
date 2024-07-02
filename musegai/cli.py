@@ -38,7 +38,7 @@ def infer(images, dest, filename, format, model, side, tempdir, verbose, overwri
         logging.basicConfig(level=logging.INFO)
 
     root = pathlib.Path(root) if root else pathlib.Path(".")
-    
+
     if not images:
         models = api.list_models()
         # no argument: list available models
@@ -46,14 +46,14 @@ def infer(images, dest, filename, format, model, side, tempdir, verbose, overwri
         for available_model in models:
             click.echo(f"\t{available_model}")
         sys.exit(0)
-    
+
     # get nchannel from model metadata
     model_info = api.get_model_info(model)
-    if model == 'fabianbalsiger/museg:thigh-model3':
-        nchannel=2
+    if model == "fabianbalsiger/museg:thigh-model3":
+        nchannel = 2
     else:
         nchannel = int(model_info["nchannel"])
-    
+
     if 1 < len(images) != nchannel:
         click.echo(f"Expecting {nchannel} channels, got {len(images)} expression(s).")
         sys.exit(1)
@@ -63,7 +63,7 @@ def infer(images, dest, filename, format, model, side, tempdir, verbose, overwri
         # find images
         if pathlib.Path(expr).is_absolute():
             # assume a directory
-            click.echo(f'\tAbsolute paths are not accepted: {expr}')
+            click.echo(f"\tAbsolute paths are not accepted: {expr}")
         files = sorted(root.rglob(expr))
         image_files.append(files)
 
@@ -95,7 +95,7 @@ def infer(images, dest, filename, format, model, side, tempdir, verbose, overwri
 
     # check number of channels
     names = sorted(images)
-    numchan = {name: len(images[name]) for name in names if len(images[name])!= nchannel}
+    numchan = {name: len(images[name]) for name in names if len(images[name]) != nchannel}
     if numchan:
         click.echo(f"Did not find {nchannel} channel(s) in:")
         for name in numchan:
@@ -106,10 +106,7 @@ def infer(images, dest, filename, format, model, side, tempdir, verbose, overwri
     dest = pathlib.Path(root if dest is None else dest)
     dest.mkdir(exist_ok=True, parents=True)
     destloc = {name: images[name][0].relative_to(root).parent for name in names}
-    labels = {
-        name: (dest / destloc[name] / filename).with_suffix(format) 
-        for name in names
-    }
+    labels = {name: (dest / destloc[name] / filename).with_suffix(format) for name in names}
 
     click.echo(f"Found {len(images)} image to segment (num. channels: {nchannel}):")
     for i, name in enumerate(names):
@@ -157,7 +154,7 @@ def infer(images, dest, filename, format, model, side, tempdir, verbose, overwri
 @click.option("-d", "--dest", type=click.Path(), help="Output directory for model files.")
 @click.option("--nchannel", type=int, default=1, help="Expected number of channels")
 @click.option("--folds", help="specify fold numbers to train as tuple")
-@click.option("--nepoch", type=click.Choice(['1', '10', '100', '250', '1000']), default='250', help="Number of epochs")
+@click.option("--nepoch", type=click.Choice(["1", "10", "100", "250", "1000"]), default="250", help="Number of epochs")
 @click.option("--split", is_flag=True, help="Split datasets into left and right parts")
 @click.option("--continue", "continue_training", is_flag=True, help="Continue training.")
 @click.option("-v", "--verbose", is_flag=True)
@@ -257,7 +254,20 @@ def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, des
 
     # train model
     split_axis = None if not split else 0
-    api.train_model(model, images, rois, labelfile, dest, split_axis=split_axis, train_model=train, make_dockerfile=dockerfile, folds=folds, preprocess=preprocess, nepoch=nepoch, continue_training=continue_training)
+    api.train_model(
+        model,
+        images,
+        rois,
+        labelfile,
+        dest,
+        split_axis=split_axis,
+        train_model=train,
+        make_dockerfile=dockerfile,
+        folds=folds,
+        preprocess=preprocess,
+        nepoch=nepoch,
+        continue_training=continue_training,
+    )
 
 
 if __name__ == "__main__":

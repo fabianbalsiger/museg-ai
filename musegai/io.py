@@ -189,7 +189,7 @@ class Labels:
         elif isinstance(item, str):
             dct = dict(zip(self.descriptions, self.indices))
         else:
-            raise ValueError(f'Invalid item type: {item}')
+            raise ValueError(f"Invalid item type: {item}")
         return dct[item]
 
     def append(self, description, *, color=None, transparency=1, visibility=1):
@@ -208,10 +208,9 @@ class Labels:
         if isinstance(item, str):
             index = self.descriptions.index(item)
         else:
-            raise ValueError(f'Invalid item type: {item}')
+            raise ValueError(f"Invalid item type: {item}")
         indices = [i for i in self.indices if i != index]
         return self.subset(indices, reindex=reindex)
-
 
     def subset(self, indices, reindex=True):
         num = len(indices)

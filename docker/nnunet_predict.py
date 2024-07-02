@@ -1,4 +1,5 @@
 """Wrapper for nnUNet_predict (nnunet.inference.predict_simple.main) that copies a label file after prediction."""
+
 from __future__ import annotations
 
 import argparse
