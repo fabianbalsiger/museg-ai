@@ -100,7 +100,7 @@ class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
 
             self.max_iter = 2#max_iter # maximal number of click during an iteration of training
             self.nbr_supervised = 0.5#nbr_supervised  # number of image that are trained with clicks
-            self.dataset_json = dataset_json #info on the dataset -> maybe not useful
+            self.dataset_json = dataset_json #info on the dataset 
             
 
     def train_step(self, batch: dict) -> dict:
@@ -165,8 +165,8 @@ class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
 
                             #getting the worst prediction label
                             label_list,misslabeled_count=true_value.unique(return_counts=True)
-                            if len(misslabeled_count)==0: #when the network does 0 mistake 
-                                print('no misslabeled pixel (perfect prediction)')
+                            if len(misslabeled_count)==0: #when the network does 0 mistake because there is nothing to predict
+                                print('slice is only noise')
                                 continue
                             else:
                                 max_value=torch.max(misslabeled_count).item()
@@ -188,7 +188,7 @@ class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
                                     return torch.where(torch.conv2d(image.unsqueeze(0).unsqueeze(0),kernel,padding=1)>=1,1,0).squeeze(0).squeeze(0)
                                 
                                 def get_probabilities(mask):
-                                    """compute chmafer distance and transform into probability map (up to a factor)"""
+                                    """compute chamfer distance and transforms it into probability map (up to a factor)"""
                                     contour=dilatation(mask)-mask
                                     dist=chamfer_distance_torch(torch.nonzero(mask==1).float(),torch.nonzero(contour==1).float())
                                     return torch.exp(dist)-1
@@ -229,9 +229,10 @@ class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
                                                       
                 else:
                     break
-            #here we smoothed the click data
+            #here we smoothed the click data...
             kernel_size=(3,3)
             sigma=(2,2)
+            # ... by applying gaussian fitlering and normalization to click's channels
             for channel in range(1,c):
                 data[:,channel]=F.gaussian_blur(data[:,channel],kernel_size,sigma)
             print("clicks generated, starting batch training...")
