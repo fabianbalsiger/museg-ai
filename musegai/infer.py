@@ -27,7 +27,7 @@ def tame_side(side):
     raise ValueError(f"Unknown side value: {side}")
 
 
-def infer(model, images, outputs=None, *, side=None, tempdir=None):
+def infer(model, images, outputs=None, *, side=None, tempdir=None, copy_inputs=False):
     """run inference on images
 
     Args
@@ -121,7 +121,13 @@ def infer(model, images, outputs=None, *, side=None, tempdir=None):
     # return volumes or files?
     if not outputs:
         return rois, labels
-    for filename, labelmap in zip(outputs, rois):
+    # for filename, labelmap, image in zip(outputs, rois, images, strict=True):
+    for index in range(nimage):
+        filename = outputs[index]
         filename.parent.mkdir(exist_ok=True, parents=True)
-        io.save(filename, labelmap)
+        io.save(filename, rois[index])
         io.save_labels(filename.parent / "labels.txt", labels)
+        if copy_inputs:
+            for chan in images[index]:
+                image = io.load(chan)
+                io.save(filename.parent / chan.name, image)
