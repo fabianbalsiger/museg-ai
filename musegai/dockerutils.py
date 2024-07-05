@@ -131,7 +131,7 @@ def run_training(model, dirname, folds=(0, 1, 2, 3, 4), nepoch=1000, preprocess=
 def get_ressources():
     """get the path to the ressources folder"""
     here = pathlib.Path(__file__).parent
-    return here.parent / "docker" / "training"
+    return here / 'data'
 
 
 def make_dockerfile(model, dirname, nchannel, folds=(0, 1, 2, 3, 4), nepoch=1000):

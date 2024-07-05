@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "MuSeg-AI"
 description = "A minimal annotation muscle segmentation toolbox."
 requires-python = ">=3.8"
-version = "0.2.dev2"
+version = "0.2.dev3"
 dependencies = [
     "numpy",
     "SimpleITK",
@@ -38,7 +38,7 @@ dev = [
 ]
 
 [tool.setuptools]
-packages = ["musegai"]
+packages = ["musegai", "musegai.data"]
 include-package-data = true
 py-modules = []  # avoid error with pip-compile, cf. https://github.com/jazzband/pip-tools/issues/1711
 

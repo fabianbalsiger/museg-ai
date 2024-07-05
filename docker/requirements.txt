@@ -1,2 +1,2 @@
-nnunet==1.7.1
-torch==2.0.0
+torch==2.3.0
+nnunetv2==2.4.2
