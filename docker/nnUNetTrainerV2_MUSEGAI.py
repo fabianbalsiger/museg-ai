@@ -1,9 +1,7 @@
 """Custom nnU-Net trainer allowing to ignore unsegmented image slices in a volume when computing the loss."""
 from __future__ import annotations
 
-import SimpleITK as sitk
 import numpy as np
-import json
 import torch
 from pathlib import Path
 import torchvision.transforms.functional as F
@@ -112,7 +110,7 @@ class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
         else:
             target = target.to(self.device, non_blocking=True)
         #Part where we are going to simulate clicks:
-        #starting by creating channels to store clicks:
+
         b,c,d,h,w= data.size()  # batch, channel, depth, height, width
         groundtruth=target[0]
 
