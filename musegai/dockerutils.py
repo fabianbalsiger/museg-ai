@@ -36,7 +36,7 @@ def get_model_info(model):
             if f"{model}" == image.tags[0]:
                 model_info[image.tags[0]] = image.labels
         except IndexError:
-            pass        
+            pass
     return model_info[model]
     # return [
     #     f"fabianbalsiger/museg:thigh-model3",
@@ -77,7 +77,7 @@ def check_training():
     return True
 
 
-def run_training(model, dirname, folds=(0, 1, 2, 3, 4), preprocess=True):
+def run_training(model, dirname, folds=(0, 1, 2, 3, 4), nepoch=1000, preprocess=True, continue_training=False):
     """Run training"""
     dirname = str(pathlib.Path(dirname).resolve())
     client = docker.from_env()
@@ -105,33 +105,45 @@ def run_training(model, dirname, folds=(0, 1, 2, 3, 4), preprocess=True):
     # preprocess
     if preprocess:
         status = run("nnUNetv2_plan_and_preprocess", ["-d", "001", "-c", "3d_fullres", "--verify_dataset_integrity"])
+        # "-pl nnUNetPlannerResEncL" # (M/L/XL)
+
+    opts = []
+    if nepoch != 1000:
+        opts.extend(["-tr", f"nnUNetTrainer_{nepoch}epochs"])
+    if continue_training:
+        print("Warning: continue training")
+        opts.extend(["--c"])
 
     # train
+    # -p nnUNetResEncUNetLPlans # (M/L/XL)
     if 0 in folds:
-        status = run("nnUNetv2_train", ["001", "3d_fullres", "0"])
+        status = run("nnUNetv2_train", ["001", "3d_fullres", "0"] + opts)
     if 1 in folds:
-        status = run("nnUNetv2_train", ["001", "3d_fullres", "1"])
+        status = run("nnUNetv2_train", ["001", "3d_fullres", "1"] + opts)
     if 2 in folds:
-        status = run("nnUNetv2_train", ["001", "3d_fullres", "2"])
+        status = run("nnUNetv2_train", ["001", "3d_fullres", "2"] + opts)
     if 3 in folds:
-        status = run("nnUNetv2_train", ["001", "3d_fullres", "3"])
+        status = run("nnUNetv2_train", ["001", "3d_fullres", "3"] + opts)
     if 4 in folds:
-        status = run("nnUNetv2_train", ["001", "3d_fullres", "4"])
+        status = run("nnUNetv2_train", ["001", "3d_fullres", "4"] + opts)
 
 
 def get_ressources():
     """get the path to the ressources folder"""
     here = pathlib.Path(__file__).parent
-    return here.parent / "docker" / "training"
+    return here / 'data'
 
 
-def make_dockerfile(model, dirname, nchannel, folds=(0, 1, 2, 3, 4)):
+def make_dockerfile(model, dirname, nchannel, folds=(0, 1, 2, 3, 4), nepoch=1000):
     """build inference docker"""
     client = docker.from_env()
 
+    trainer = "nnUNetTrainer"
+    if nepoch != 1000:
+        trainer = f"nnUNetTrainer_{nepoch}epochs"
+
     # get docker template
-    dockerfile = docker_template.make_docker(model, dirname, folds, nchannel=nchannel)
-    # dockerfile = docker_template.make_docker(model, dirname, folds=(0,))
+    dockerfile = docker_template.make_docker(model, dirname, folds, nchannel=nchannel, trainer=trainer)
 
     # get the requirement file
     ressources_dir = get_ressources()

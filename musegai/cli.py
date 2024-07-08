@@ -14,28 +14,46 @@ from musegai import api
 @click.group()
 def cli(): ...
 
+@cli.command()
+def list():
+    """ List available models """
+    models = api.list_models()
+    # no argument: list available models
+    click.echo("Available segmentation models:")
+    for available_model in models:
+        click.echo(f"\t{available_model}")
+    sys.exit(0)
+
 
 @cli.command(context_settings={"show_default": True})
+@click.argument("model")
 @click.argument("images", nargs=-1)
-@click.option("-d", "--dest", type=click.Path(), help="Output directory.")
+@click.option('-o', "--overwrite", is_flag=True, help="Overwrite already existing files.")
+@click.option("-r", "--root", type=click.Path(exists=True), help="Input root directory.")
+@click.option("-d", "--dest", type=click.Path(), help="Output root directory.")
 @click.option("--filename", default="roi", help="Segmentation filename.")
+@click.option("--dirname", help="Segmentation parent folder.")
 @click.option("-f", "--format", default=".nii.gz", type=click.Choice([".nii.gz", ".mha", ".mhd", ".hdr"]))
-@click.option("--model", default="thigh-model3", help="Specify the segmentation model.")
 @click.option("--side", default="LR", type=click.Choice(["L", "R", "LR", "NA"]), help="Limb's side(s) in image")
+@click.option("--tempdir", type=click.Path(exists=True), help="Location for nnUNet temporary files.")
 @click.option("-v", "--verbose", is_flag=True, help="Show more information")
-@click.option("--tempdir", type=click.Path(exists=True), help="Location for temporary files.")
-@click.option("-r", "--root", type=click.Path(exists=True), help="Root directory for training data.")
-@click.option("--overwrite", type=bool, default=False, help="specify if you want to overwrite already existing files in output dir")
-def infer(images, dest, filename, format, model, side, tempdir, verbose, overwrite, root):
+def infer(images, dest, dirname, filename, format, model, side, tempdir, verbose, overwrite, root):
     """Automatic muscle segmentation command line tool.
 
     \b
-    images can be:
-        - (nothing): show available segmentation models
-        - a file pattern of images to segment (if multiple channels, images must be numbered)
+    IMAGES: file name(s) or pattern(s) of images to segment.
+    Multiple channels are assumed either:
+    - if image files are numbered
+    - if multiple patterns are passed
+    
     """
     if verbose:
         logging.basicConfig(level=logging.INFO)
+
+    # copy inputs to outputs
+    copy_inputs = (dirname is not None) or (dest is not None)
+
+    root = pathlib.Path(root) if root else pathlib.Path(".")
 
     if not images:
         models = api.list_models()
@@ -44,66 +62,85 @@ def infer(images, dest, filename, format, model, side, tempdir, verbose, overwri
         for available_model in models:
             click.echo(f"\t{available_model}")
         sys.exit(0)
-    elif len(images) > 1:
-        click.echo(f"Invalid number of arguments")
-        for ims in images:
-            click.echo(f'\t{", ".join(map(str, ims))}')
-        sys.exit(1)
 
-    images = images[0]
-
-    # check if the number of channel is consistent
+    # get nchannel from model metadata
     model_info = api.get_model_info(model)
-    if model == 'fabianbalsiger/museg:thigh-model3':
-        nchannel=2
+    if model == "fabianbalsiger/museg:thigh-model3":
+        nchannel = 2
     else:
         nchannel = int(model_info["nchannel"])
 
-    # find images
-    if pathlib.Path(images).is_absolute():
-        # assume a directory
-        image_files = sorted(pathlib.Path(images).rglob("*"))
-    else:
-        root = pathlib.Path(root) if root else pathlib.Path(".")
-        image_files = sorted(root.rglob(images))
-
-    if not image_files:
-        click.echo(f"No image file found, check expression: {images}")
+    if 1 < len(images) != nchannel:
+        click.echo(f"Expecting {nchannel} channels, got {len(images)} expression(s).")
         sys.exit(1)
 
-    regex = re.compile(r"(.+?)(\d*)\.([\.\w]+)$")
-    images = {}
-    for file in image_files:
-        match = regex.match(str(file))
-        if not match or not api.is_image(file):
-            continue
-        common, index, ext = match.groups()
-        images.setdefault(common, []).append(file)
+    image_files = []
+    for expr in images:
+        # find images
+        if pathlib.Path(expr).is_absolute():
+            # assume a directory
+            click.echo(f"\tAbsolute paths are not accepted: {expr}")
+        files = sorted(root.rglob(expr))
+        image_files.append(files)
 
-    images = [tuple(sorted(images[im]))[:nchannel] for im in sorted(images)]
+    num_files = {expr: len(files) for expr, files in zip(images, image_files)}
+    if any(num == 0 for num in num_files):
+        click.echo(f"No image files found, check expression(s): {[ex for ex in num_files if num_files[ex] == 0]}")
+        sys.exit(1)
+
+    images = {}
+    if len(image_files) == 1:
+        # numbered channels
+        regex = re.compile(r"(.+?)(\d*)\.([\.\w]+)$")
+        for file in image_files[0]:
+            match = regex.match(str(file))
+            if not match or not api.is_image(file):
+                continue
+            common, index, ext = match.groups()
+            images.setdefault(common, []).append(file)
+    else:
+        # one expression per channel
+        regex = re.compile(r"(.+?)\.([\.\w]+)$")
+        for files in image_files:
+            for file in files:
+                match = regex.match(str(file))
+                if not match or not api.is_image(file):
+                    continue
+                common = file.parent
+                images.setdefault(common, []).append(file)
+
+    # check number of channels
+    names = sorted(images)
+    numchan = {name: len(images[name]) for name in names if len(images[name]) != nchannel}
+    if numchan:
+        click.echo(f"Did not find {nchannel} channel(s) in:")
+        for name in numchan:
+            click.echo(f'\t{name}: {", ".join(f"[{i + 1}] {file}" for i, file in enumerate(images[name]))}')
+        sys.exit(1)
 
     # destination
     dest = pathlib.Path(root if dest is None else dest)
     dest.mkdir(exist_ok=True, parents=True)
-    destfiles = {name: (dest / name[0].parent / filename).with_suffix(format) for name in images}
-
-    inputs = images
-    outputs = list(destfiles.values())
+    destloc = {name: images[name][0].relative_to(root).parent for name in names}
+    if dirname:
+        destloc = {name: loc.parent / dirname for name, loc in destloc.items()}
+    labels = {name: (dest / destloc[name] / filename).with_suffix(format) for name in names}
 
     click.echo(f"Found {len(images)} image to segment (num. channels: {nchannel}):")
-    for i in range(len(inputs)):
+    for i, name in enumerate(names):
         click.echo(f"({i+1})")
         for j in range(nchannel):
-            click.echo(f"\tchan1:  {images[i][j]}")
-        click.echo(f"\tlabels:  {outputs[i]}")
+            click.echo(f"\tchan. {j + 1:02d}: {images[name][j]}")
+        click.echo(f"\tlabels:   {labels[name]}")
+    click.confirm("Are all images correctly selected?", abort=True)
 
     # dealing whith already existent files in output directory
     if not overwrite:
-        for name in list(destfiles):
-            if destfiles[name].is_file():
-                click.echo(f"Output file already exists: {destfiles[name]}, skipping")
-                images.remove(name)
-                destfiles.pop(name)
+        for name in names:
+            if labels[name].is_file():
+                click.echo(f"Output file already exists: {labels[name]}, skipping")
+                images.pop(name)
+                labels.pop(name)
 
     if not images:
         click.echo("Nothing to do.")
@@ -113,9 +150,12 @@ def infer(images, dest, filename, format, model, side, tempdir, verbose, overwri
     if side == "NA":
         side = None
 
+    inputs = [images[name] for name in names]
+    outputs = [labels[name] for name in names]
+
     # segment images
     click.echo(f"Segmenting {len(images)} volume(s)...")
-    api.run_model(model, inputs, outputs, side=side, tempdir=tempdir)
+    api.run_model(model, inputs, outputs, side=side, tempdir=tempdir, copy_inputs=copy_inputs)
 
     click.echo("Done.")
 
@@ -131,19 +171,22 @@ def infer(images, dest, filename, format, model, side, tempdir, verbose, overwri
 @click.option("-r", "--root", type=click.Path(exists=True), help="Root directory for training data.")
 @click.option("-d", "--dest", type=click.Path(), help="Output directory for model files.")
 @click.option("--nchannel", type=int, default=1, help="Expected number of channels")
-@click.option("--split", is_flag=True, help="Split datasets into left and right parts")
-@click.option("-v", "--verbose", is_flag=True)
 @click.option("--folds", help="specify fold numbers to train as tuple")
-def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, dest, split, verbose, folds, preprocess):
+@click.option("--nepoch", type=click.Choice(["1", "10", "100", "250", "1000"]), default="250", help="Number of epochs")
+@click.option("--split", is_flag=True, help="Split datasets into left and right parts")
+@click.option("--continue", "continue_training", is_flag=True, help="Continue training.")
+@click.option("-v", "--verbose", is_flag=True)
+def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, dest, split, verbose, folds, preprocess, nepoch, continue_training):
     """Create new segmentation model using training images and rois"""
     if verbose:
         logging.basicConfig(level=logging.INFO)
+    nepoch = int(nepoch)
 
     # output dir
     if not dest:
         dest = pathlib.Path(".") / model.replace(":", "_")
     else:
-        dest = pathlib.Path(dest)
+        dest = pathlib.Path(dest.strip())
 
     if set(pathlib.Path(dest).glob("*")) and train:
         click.confirm(f"Output folder `{dest}` is not empty, do you want to continue?", abort=True)
@@ -221,15 +264,28 @@ def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, des
     for i in range(nimage):
         click.echo(f"({i+1})")
         for j in range(nchannel):
-            click.echo(f"\tchan. {j + 1:02d}:  {images[i][j]}")
-        click.echo(f"\tlabels:    {rois[i]}")
+            click.echo(f"\tchan. {j + 1:02d}: {images[i][j]}")
+        click.echo(f"\tlabels:   {rois[i]}")
         if len(roi_dates[i]) > 1:
             click.echo(f'\t(latest among: {", ".join(roi_dates[i])})')
     ans = click.confirm("Are all images/rois correctly matched?", abort=True)
 
     # train model
     split_axis = None if not split else 0
-    api.train_model(model, images, rois, labelfile, dest, split_axis=split_axis, train_model=train, make_dockerfile=dockerfile, folds=folds, preprocess=preprocess)
+    api.train_model(
+        model,
+        images,
+        rois,
+        labelfile,
+        dest,
+        split_axis=split_axis,
+        train_model=train,
+        make_dockerfile=dockerfile,
+        folds=folds,
+        preprocess=preprocess,
+        nepoch=nepoch,
+        continue_training=continue_training,
+    )
 
 
 if __name__ == "__main__":

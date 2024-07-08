@@ -19,7 +19,22 @@ LOGGER = logging.getLogger(__name__)
 """
 
 
-def train(model, images, rois, labels, outdir, *, split_axis=None, train_model=True, make_dockerfile=True, folds=(0, 1, 2, 3, 4), preprocess=True):
+def train(
+    model,
+    images,
+    rois,
+    labels,
+    outdir,
+    *,
+    split_axis=None,
+    train_model=True,
+    make_dockerfile=True,
+    folds=(0, 1, 2, 3, 4),
+    nepoch=250,
+    preprocess=True,
+    random_pruning=True,
+    continue_training=False,
+):
     """train new model on provided datasets
 
     Args
@@ -63,16 +78,23 @@ def train(model, images, rois, labels, outdir, *, split_axis=None, train_model=T
         splits = [descr.rsplit("_", 1) for descr in labels.descriptions]
         labels.descriptions = [split[0] if split[-1].upper() in ["L", "R"] else descr for split, descr in zip(splits, labels.descriptions)]
     # set 0 as background
-    labels.descriptions[0] = 'background'
+    labels.descriptions[0] = "background"
     # add ignore label
-    labels.append('ignore', color=(255, 0, 0), visibility=0)
-    ignore_label = labels['ignore']
+    labels.append("ignore", color=(255, 0, 0), visibility=0)
+    ignore_label = labels["ignore"]
     # remap index values
-    uniquelabels = {name: index for index, name in zip(labels.indices[::-1], labels.descriptions[::-1])}
-    labelremap = np.array([uniquelabels[name] for name in labels.descriptions])
+    uniquelabels = set(labels.descriptions)
+    labelset = set(labels[name] for name in uniquelabels)
+    labelremap = -1 * np.ones(max(labels.indices) + 1, dtype=int)
+    labelremap[np.array(list(labelset), dtype=int)] = np.arange(len(uniquelabels))
+    # reindex labels
+    labels = labels.subset(labelset)
+
+    # random state
+    rstate = np.random.RandomState(0)
 
     if train_model and preprocess:
-        LOGGER.info("Start training (num. images: {nimage}, num. channels: {nchannel})")
+        LOGGER.info(f"Start training (num. images: {nimage}, num. channels: {nchannel})")
 
         # create folder structure
         root = pathlib.Path(outdir)
@@ -87,7 +109,7 @@ def train(model, images, rois, labels, outdir, *, split_axis=None, train_model=T
 
         # check and copy each volume
         num = 0
-        labelset = None
+        # labelset = None
         for index in range(nimage):
             LOGGER.info(f"Loading dataset {index + 1}/{nimage}")
 
@@ -98,23 +120,24 @@ def train(model, images, rois, labels, outdir, *, split_axis=None, train_model=T
             empty_slices = np.all(labelmap.array == 0, axis=(0, 1))
             labelmap.array[:, :, empty_slices] = ignore_label
 
-            if labelremap is not None:
-                labelmap.array = labelremap[labelmap.array]
+            nprune = 0
+            if random_pruning:
+                # remove slices at the bottom
+                nprune = rstate.randint(0, np.argmin(empty_slices) + 1)
+                if nprune:
+                    LOGGER.info(f"Pruning {nprune} slices at the bottom of the volume")
+                    labelmap.array = labelmap.array[:, :, nprune:]
 
-            # make label values contiguous
-            _labelset, array = np.unique(labelmap, return_inverse=True)
-            labelmap.array = array.reshape(labelmap.shape)
+            # check labels
+            _labelset = np.unique(labelmap)
+            if not set(_labelset) <= labelset:
+                raise ValueError(f"Inconsistent label values in dataset {index + 1}: {_labelset} not included in {labelset}.")
+            elif set(_labelset) != labelset:
+                diff = [labels[i] for i in (set(_labelset) - labelset)]
+                print(f"Warning, in dataset {index + 1}, some labels are missing: {diff}")
 
-            # setup labels
-            if labelset is None:
-                labelset = set(_labelset)
-                # check label indices
-                if not labelset <= set(labels.indices):
-                    raise ValueError(f"Labels object does not contain all label values")
-                # reindex labels
-                labels = labels.subset(labelset, reindex=True)
-            elif labelset != set(_labelset):
-                raise ValueError(f"Inconsistent label values in dataset {index + 1}: {labelset} != {_labelset}")
+            # remap labelmap (remove duplicate label names, make labels consecutive)
+            labelmap.array = labelremap[labelmap.array]
 
             if split_axis is not None:
                 # split into halves (eg. left and right sides)
@@ -125,6 +148,7 @@ def train(model, images, rois, labels, outdir, *, split_axis=None, train_model=T
                     io.save(data_dir / labeldir / roiname.format(num=num), labelsA)
                     for channel in range(nchannel):
                         image = io.load(images[index][channel])
+                        image.array = image.array[..., nprune:]
                         imageA, _ = io.split(image, split_axis)
                         io.save(data_dir / imagedir / imagename.format(num=num, channel=channel), imageA)
                     num += 1
@@ -133,6 +157,7 @@ def train(model, images, rois, labels, outdir, *, split_axis=None, train_model=T
                     io.save(data_dir / labeldir / roiname.format(num=num), labelsB)
                     for channel in range(nchannel):
                         image = io.load(images[index][channel])
+                        image.array = image.array[..., nprune:]
                         _, imageB = io.split(image, split_axis)
                         io.save(data_dir / imagedir / imagename.format(num=num, channel=channel), imageB)
                     num += 1
@@ -142,6 +167,7 @@ def train(model, images, rois, labels, outdir, *, split_axis=None, train_model=T
                 io.save(data_dir / labeldir / roiname.format(num=num), labelmap)
                 for channel in range(nchannel):
                     image = io.load(images[index][channel])
+                    image.array = image.array[..., nprune:]
                     io.save(data_dir / imagedir / imagename.format(num=num, channel=channel), image)
                 num += 1
             #adding click channels
@@ -175,8 +201,8 @@ def train(model, images, rois, labels, outdir, *, split_axis=None, train_model=T
             json.dump(meta, fp)
 
         # store label file
-        if 'ignore' in labels.descriptions:
-            labels = labels.remove('ignore')
+        if "ignore" in labels.descriptions:
+            labels = labels.remove("ignore")
         io.save_labels(outdir / "labels.txt", labels)
 
         LOGGER.info(f"Done copying training data (num. training: {num})")
@@ -184,7 +210,7 @@ def train(model, images, rois, labels, outdir, *, split_axis=None, train_model=T
     if train_model:
         # run nnU-net training
         LOGGER.info(f"Run nnU-net training")
-        dockerutils.run_training(model, outdir, folds=folds, preprocess=preprocess)
+        dockerutils.run_training(model, outdir, nepoch=nepoch, folds=folds, preprocess=preprocess, continue_training=continue_training)
 
     if make_dockerfile:
         LOGGER.info(f"\nGenerate dockerfile for model {model}")
@@ -192,4 +218,4 @@ def train(model, images, rois, labels, outdir, *, split_axis=None, train_model=T
         fold_dirs = list((outdir / "nnUNet_results").rglob("fold_*/checkpoint_final.pth"))
         folds = [int(dirname.parent.name.split("_")[1]) for dirname in fold_dirs]
         # make dockerfile
-        dockerutils.make_dockerfile(model, outdir, nchannel, folds=folds)
+        dockerutils.make_dockerfile(model, outdir, nchannel, folds=folds, nepoch=nepoch)
