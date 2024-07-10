@@ -173,10 +173,10 @@ def infer(images, dest, dirname, filename, format, model, side, tempdir, verbose
 @click.option("--nchannel", type=int, default=1, help="Expected number of channels")
 @click.option("--folds", help="specify fold numbers to train as tuple")
 @click.option("--nepoch", type=click.Choice(["1", "10", "100", "250", "1000"]), default="250", help="Number of epochs")
-@click.option("--split", is_flag=True, help="Split datasets into left and right parts")
+# @click.option("--split", is_flag=True, help="Split datasets into left and right parts")
 @click.option("--continue", "continue_training", is_flag=True, help="Continue training.")
 @click.option("-v", "--verbose", is_flag=True)
-def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, dest, split, verbose, folds, preprocess, nepoch, continue_training):
+def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, dest, verbose, folds, preprocess, nepoch, continue_training):
     """Create new segmentation model using training images and rois"""
     if verbose:
         logging.basicConfig(level=logging.INFO)
@@ -236,7 +236,7 @@ def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, des
 
     images = [tuple(sorted(images[prefix]))[:nchannel] for prefix in sorted(images)]
     rois = [tuple(sorted(rois[prefix]))[-1] for prefix in sorted(rois)]
-    roi_dates = list(roi_dates.values())
+    roi_dates = tuple(roi_dates.values())
 
     nimage = len(images)
     if len(rois) != nimage:
@@ -271,7 +271,7 @@ def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, des
     ans = click.confirm("Are all images/rois correctly matched?", abort=True)
 
     # train model
-    split_axis = None if not split else 0
+    split_axis = 0 #None if not split else 0
     api.train_model(
         model,
         images,

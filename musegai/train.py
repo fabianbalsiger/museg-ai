@@ -32,7 +32,7 @@ def train(
     folds=(0, 1, 2, 3, 4),
     nepoch=250,
     preprocess=True,
-    random_pruning=True,
+    random_pruning=False,
     continue_training=False,
 ):
     """train new model on provided datasets
@@ -73,10 +73,15 @@ def train(
 
     # check label file
     labels = io.load_labels(labels)
-    if split_axis is not None:
-        # remove side suffix in label descriptions
-        splits = [descr.rsplit("_", 1) for descr in labels.descriptions]
-        labels.descriptions = [split[0] if split[-1].upper() in ["L", "R"] else descr for split, descr in zip(splits, labels.descriptions)]
+    # if split_axis is not None:
+    # remove side suffix in label descriptions
+    is_right = {i for i in labels if labels[i].endswith('_R')}
+    is_left = {i for i in labels if labels[i].endswith('_L')}
+    labels.description = [descr[:-2] if i in (is_right | is_left) else descr for i, descr in zip(labels, labels.descriptions)]
+    # splits = [descr.rsplit("_", 1) for descr in labels.descriptions]
+    # labels.descriptions = [split[0] if split[-1].upper() in ["L", "R"] else descr for split, descr in zip(splits, labels.descriptions)]
+
+
     # set 0 as background
     labels.descriptions[0] = "background"
     # add ignore label
@@ -129,18 +134,20 @@ def train(
                     labelmap.array = labelmap.array[:, :, nprune:]
 
             # check labels
-            _labelset = np.unique(labelmap)
-            if not set(_labelset) <= labelset:
+            _labelset = set(np.unique(labelmap)) | {ignore_label}
+            if not _labelset <= labelset:
                 raise ValueError(f"Inconsistent label values in dataset {index + 1}: {_labelset} not included in {labelset}.")
-            elif set(_labelset) != labelset:
-                diff = [labels[i] for i in (set(_labelset) - labelset)]
-                print(f"Warning, in dataset {index + 1}, some labels are missing: {diff}")
+            elif _labelset != labelset:
+                diff = [labels[i] for i in (labelset - _labelset)]
+                LOGGER.warn(f"Warning, in dataset {index + 1}, some labels are missing: {diff}")
 
             # remap labelmap (remove duplicate label names, make labels consecutive)
             labelmap.array = labelremap[labelmap.array]
 
-            if split_axis is not None:
-                # split into halves (eg. left and right sides)
+            # if split_axis is not None:
+            if (_labelset & is_left) and (_labelset & is_right):
+                LOGGER.info('Splitting volume into left and right sides')
+                
                 labelsA, labelsB = io.split(labelmap, split_axis)
                 keepA, keepB = np.any(labelsA.array > 0), np.any(labelsB.array > 0)
 
