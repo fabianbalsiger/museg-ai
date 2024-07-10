@@ -236,7 +236,8 @@ def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, des
 
     images = [tuple(sorted(images[prefix]))[:nchannel] for prefix in sorted(images)]
     rois = [tuple(sorted(rois[prefix]))[-1] for prefix in sorted(rois)]
-    roi_dates = list(roi_dates.values())
+    #roi_dates = list(roi_dates.values())
+    roi_dates=[k for k in roi_dates.values()]
 
     nimage = len(images)
     if len(rois) != nimage:
