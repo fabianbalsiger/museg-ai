@@ -167,6 +167,9 @@ class interactive_nnUNetTrainer(nnUNetTrainer.nnUNetTrainer):
                                 print('slice is only noise')
                                 continue
                             else:
+                                # proportional_count=[misslabeled_count[k]/(groundtruth[nimage,0,d]==k).sum() for k in range(len(misslabeled_count))]
+                                # for k in range(len(misslabeled_count)):
+                                #     proportional_count.append(misslabeled_count[k]/(groundtruth[nimage,0,d]==k).sum())
                                 max_value=torch.max(misslabeled_count).item()
                                 worst_labels=(misslabeled_count==max_value).nonzero(as_tuple=False)
                                 chosen_label=int(label_list[worst_labels][np.random.randint(len(worst_labels))].item())
