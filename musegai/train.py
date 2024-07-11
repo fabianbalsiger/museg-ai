@@ -171,15 +171,19 @@ def train(
                     io.save(data_dir / imagedir / imagename.format(num=num, channel=channel), image)
                 num += 1
             #adding click channels
-            def add_click_chan(image,nlabels):
+            def add_click_chan(image,labels):
                 """image is one single image (case) with all its channels"""
+                #labels is a label type 
+                nlabels=len(labels)
+                label_list=[k for k in labels.__iter__()]
+                # if 'ignore' in labels.__getitem__(label_list[-1]):
+                #      nlabels= nlabels-1
                 click_chan=io.load(image[0])
                 for k in range(nlabels):
                     click_chan.array = 0 * click_chan.array
                     io.save(data_dir/imagedir/imagename.format(num=num-1, channel=nchannel+k), click_chan)
-
-            
-            add_click_chan(images[index],len(labels.indices))
+           
+            add_click_chan(images[index],labels)
 
         # metadata
         channel_names = {f"{i}": f"mag{i:02d}" for i in range(nchannel)}
