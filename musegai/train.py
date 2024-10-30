@@ -183,15 +183,19 @@ def train(
                     click_chan.array = 0 * click_chan.array
                     io.save(data_dir/imagedir/imagename.format(num=num-1, channel=nchannel+k), click_chan)
            
-            add_click_chan(images[index],labels)
-
-        # metadata
+         # metadata
         channel_names = {f"{i}": f"mag{i:02d}" for i in range(nchannel)}
-
-        for k in range(len(labels.indices)): #addding metadata for click channels
-            channel_names[f"{nchannel+k}"]="noNorm"
-
         label_names = {labels[i]: i for i in labels}
+
+        interactive=False
+        if interactive:
+            add_click_chan(images[index],labels)
+           
+
+            for k in range(len(labels.indices)): #addding metadata for click channels
+                channel_names[f"{nchannel+k}"]="noNorm"
+
+            
 
         # store JSON metadata
         meta = {
