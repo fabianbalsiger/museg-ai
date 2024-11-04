@@ -176,26 +176,31 @@ def train(
                 #labels is a label type 
                 nlabels=len(labels)
                 label_list=[k for k in labels.__iter__()]
-                # if 'ignore' in labels.__getitem__(label_list[-1]):
-                #      nlabels= nlabels-1
+                if 'ignore' in labels.__getitem__(label_list[-1]):
+                     nlabels= nlabels-1
                 click_chan=io.load(image[0])
                 for k in range(nlabels):
                     click_chan.array = 0 * click_chan.array
                     io.save(data_dir/imagedir/imagename.format(num=num-1, channel=nchannel+k), click_chan)
-           
+            
+            interactive=True
+            if interactive:
+                add_click_chan(images[index],labels)
          # metadata
         channel_names = {f"{i}": f"mag{i:02d}" for i in range(nchannel)}
         label_names = {labels[i]: i for i in labels}
 
-        interactive=False
-        if interactive:
-            add_click_chan(images[index],labels)
+       
            
-
-            for k in range(len(labels.indices)): #addding metadata for click channels
+        if interactive:
+            if 'ignore' in labels.__getitem__(labels.indices[-1]):
+                label_count=len(labels.indices)-1
+            else:
+                label_count=len(labels.indices)
+            for k in range(label_count): #addding metadata for click channels
                 channel_names[f"{nchannel+k}"]="noNorm"
 
-            
+        
 
         # store JSON metadata
         meta = {
