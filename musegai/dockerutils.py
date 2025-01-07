@@ -29,22 +29,14 @@ def list_models(local=True):
 
 def get_model_info(model):
     """return info of the designated model"""
-    model_info = {}
     client = docker.from_env()
     for image in client.images.list():
         try:
-            if f"{model}" == image.tags[0]:
-                model_info[image.tags[0]] = image.labels
+            if model == image.tags[0]:
+                return image.labels
         except IndexError:
             pass
-    return model_info[model]
-    # return [
-    #     f"fabianbalsiger/museg:thigh-model3",
-    # ]
-    # client = docker.from_env()
-    # images = client.images.search(REPOSITORY)
-    # names = [im['name'] for im in images]
-    # return names
+    raise ValueError(f'Unknown model: {model}')
 
 
 def run_inference(model, dirname):

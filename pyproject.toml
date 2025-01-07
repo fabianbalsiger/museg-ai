@@ -11,6 +11,7 @@ dependencies = [
     "numpy",
     "SimpleITK",
     "docker",
+    "click",
 ]
 
 [project.optional-dependencies]

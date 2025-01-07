@@ -187,7 +187,8 @@ class Labels:
         if isinstance(item, int):
             dct = dict(zip(self.indices, self.descriptions))
         elif isinstance(item, str):
-            dct = dict(zip(self.descriptions, self.indices))
+            unique = set()
+            dct = {d: i for d, i in zip(self.descriptions,self.indices) if not (d in unique or unique.add(d))}
         else:
             raise ValueError(f"Invalid item type: {item}")
         return dct[item]

@@ -71,29 +71,27 @@ def train(
     if {len(im) for im in images} != {nchannel}:
         raise ValueError(f"Number of channels is not constant")
 
-    # check label file
+    # load label file
     labels = io.load_labels(labels)
-    # if split_axis is not None:
+
     # remove side suffix in label descriptions
     is_right = {i for i in labels if labels[i].endswith('_R')}
     is_left = {i for i in labels if labels[i].endswith('_L')}
-    labels.description = [descr[:-2] if i in (is_right | is_left) else descr for i, descr in zip(labels, labels.descriptions)]
-    # splits = [descr.rsplit("_", 1) for descr in labels.descriptions]
-    # labels.descriptions = [split[0] if split[-1].upper() in ["L", "R"] else descr for split, descr in zip(splits, labels.descriptions)]
-
-
+    labels.descriptions = [descr[:-2] if i in (is_right | is_left) else descr for i, descr in zip(labels, labels.descriptions)]
+        
     # set 0 as background
     labels.descriptions[0] = "background"
     # add ignore label
     labels.append("ignore", color=(255, 0, 0), visibility=0)
     ignore_label = labels["ignore"]
-    # remap index values
-    uniquelabels = set(labels.descriptions)
-    labelset = set(labels[name] for name in uniquelabels)
-    labelremap = -1 * np.ones(max(labels.indices) + 1, dtype=int)
-    labelremap[np.array(list(labelset), dtype=int)] = np.arange(len(uniquelabels))
+    # accepted labelset
+    labelset = set(labels)
     # reindex labels
-    labels = labels.subset(labelset)
+    indices, descriptions = list(labels.indices), list(labels.descriptions)
+    labels = labels.subset([labels[name] for name in set(descriptions)])
+    # remap index values
+    labelremap = -1 * np.ones(max(indices) + 1, dtype=int)
+    labelremap[np.array(indices)] = np.array([labels[name] for name in descriptions])
 
     # random state
     rstate = np.random.RandomState(0)
@@ -135,11 +133,12 @@ def train(
 
             # check labels
             _labelset = set(np.unique(labelmap)) | {ignore_label}
+            _diff = set(labels) - {int(labelremap[i]) for i in _labelset}
             if not _labelset <= labelset:
+                breakpoint()
                 raise ValueError(f"Inconsistent label values in dataset {index + 1}: {_labelset} not included in {labelset}.")
-            elif _labelset != labelset:
-                diff = [labels[i] for i in (labelset - _labelset)]
-                LOGGER.warn(f"Warning, in dataset {index + 1}, some labels are missing: {diff}")
+            elif _diff:
+                LOGGER.warning(f"Warning, in dataset {index + 1}, some labels are missing: {_diff}")
 
             # remap labelmap (remove duplicate label names, make labels consecutive)
             labelmap.array = labelremap[labelmap.array]

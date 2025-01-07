@@ -37,7 +37,7 @@ def list():
 @click.option("--side", default="LR", type=click.Choice(["L", "R", "LR", "NA"]), help="Limb's side(s) in image")
 @click.option("--tempdir", type=click.Path(exists=True), help="Location for nnUNet temporary files.")
 @click.option("-v", "--verbose", is_flag=True, help="Show more information")
-def infer(images, dest, dirname, filename, format, model, side, tempdir, verbose, overwrite, root):
+def segment(images, dest, dirname, filename, format, model, side, tempdir, verbose, overwrite, root):
     """Automatic muscle segmentation command line tool.
 
     \b
@@ -64,7 +64,12 @@ def infer(images, dest, dirname, filename, format, model, side, tempdir, verbose
         sys.exit(0)
 
     # get nchannel from model metadata
-    model_info = api.get_model_info(model)
+    try:
+        model_info = api.get_model_info(model)
+    except ValueError as exc:
+        click.echo(f'Error: {exc}')
+        sys.exit(1)
+
     if model == "fabianbalsiger/museg:thigh-model3":
         nchannel = 2
     else:
