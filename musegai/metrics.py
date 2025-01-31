@@ -1,37 +1,109 @@
 """ compute segmentation metrics """
 import csv
 import numpy as np
+import matplotlib as mpl
+from matplotlib import pyplot as plt
+mpl.use('Agg')
 
 """
-- multi-label/global DSC?
+- metric error width/size ?
+- compare mutiple models (boxplot 'hue')
+- plot:
+    - mean values for all metrics
+    - per region values for main metrics (dsc, hd95, nsd)
 """
+
+METRICS = {
+    'dsc': {'name': 'Dice Similarity Coefficient', 'short': 'DSC', 'unit': '', 'range': (0, 1)},
+    'iou': {'name': 'Intersection over Union', 'short': 'IOU', 'unit': '', 'range': (0, 1)},
+    'hd95': {'name': '96% Hausdorff Distance', 'short': 'HD95', 'unit': 'pix', 'range': (0, None)},
+    'b_iou': {'name': 'Boundary Intersection over Union', 'short': 'B-IOU', 'unit': '', 'range': (0, 1)},
+    'nsd': {'name': 'Normalized Surface Distance', 'short': 'NSD', 'unit': '', 'range': (0, 1)}
+
+}
 
 class Process:
-    def __init__(self, ref, pred, *, labels=None, ignore=None, options={}, skip_zero=True):
-        self.ref = np.asarray(ref).astype(int)
-        self.pred = np.asarray(pred).astype(int)
-        self.spacing = np.array(getattr(ref, 'spacing', (1,) * self.ref.ndim))
-        self.ignore = ignore
-        self.labels = dict(labels) or {i: f'label {i}' for i in np.unique(ref)}
-        if skip_zero:
-            self.labels.pop(0, None)
-        self.options = options
+    def __init__(self, refs, preds, *, labels=None, labels_preds=None, options={}, **kwargs):
+        if len(preds) != len(refs):
+            raise ValueError(
+                f'Different numbers of references ({len(refs)}) '
+                f'and predictions ({len(preds)})'
+            )
+        self.refs = refs
+        self.preds = preds
 
-    def __call__(self, metrics, *, subset=None, disp=True):
-        labels = {i: self.labels[i] for i in subset or self.labels}
+        # labels
+        if not isinstance(labels, list):
+            labels = [labels] * len(refs)
+        labels_preds = labels_preds or labels
+        if not isinstance(labels_preds, list):
+            labels_preds = [labels_preds] * len(preds)
+        # check label set
+        for idx in range(len(refs)):
+            lr, lp = labels[idx], labels_preds[idx]
+            missing = (set(lr.values()) - {0}) - set(lp.values())
+            if any(missing):
+                raise ValueError(f'Missing labels in prediction: {missing}')
+        self.labels = labels
+        self.labels_preds = labels_preds
+
+        self.options = options
+        self.params = {
+            'ignore_label_zero': kwargs.get('ignore_label_zero', True),
+            'ignore_empty_slices': kwargs.get('ignore_empty_slices', True),
+        }
+
+    def __call__(self, metrics, *, disp=True, subset=None):
         rows = []
-        for i in labels:
+        for idx in range(len(self.refs)):
             if disp:
-                print(f"Label: {labels[i]} ({i}):")
-            ref_mask = self.ref == i
-            pred_mask = self.pred == i
-            bin_metrics = BinaryMetrics(ref_mask, pred_mask, ignore=self.ignore, spacing=self.spacing, options=self.options)
-            row = {'label': labels[i]}
-            for metric in metrics:
-                row[metric] = bin_metrics(metric)
-                print(f"\tmetric: {metric}={row[metric]}")
-            rows.append(row)
+                print(f"Image: #{idx}")
+            ref = np.asarray(self.refs[idx]) 
+            pred = np.asarray(self.preds[idx])
+            # labels
+            labels = dict(self.labels[idx] or {i: f'label {i}' for i in np.unique(ref)})
+            labels_pred = dict(self.labels_preds[idx] or {i: f'label {i}' for i in np.unique(pred)})
+            if labels_pred != labels:
+                # remap prediction
+                pred = remap_roi(pred, labels_pred, labels, ignore_missing=True)
+            if subset is not None:
+                # labels subset
+                labels = {name: index for name, index in labels.items() if (name in subset or index in subset)}
+            spacing = np.array(getattr(self.refs[idx], 'spacing', (1,) * ref.ndim))
+            for lb in labels:
+                if lb == 0 and self.params['ignore_label_zero']:
+                   continue
+                if disp:
+                    print(f"\tLabel: {labels[lb]} ({lb}):")
+                ref_mask = ref == lb
+                pred_mask = pred == lb
+                ignore = None
+                if self.params['ignore_empty_slices']:
+                    ignore = np.zeros(ref.shape, dtype=bool) | (np.sum(ref, axis=(0, 1), keepdims=True)==0)
+                bin_metrics = BinaryMetrics(ref_mask, pred_mask, ignore=ignore, spacing=spacing, options=self.options)
+                row = {'index': idx, 'label': labels[lb]}
+                for metric in metrics:
+                    row[metric] = bin_metrics(metric)
+                    print(f"\tmetric: {metric}={row[metric]}")
+                rows.append(row)
         return rows
+    
+
+def remap_roi(roi, labels_in, labels_out, *, ignore_missing=True, ignore_zero=True):
+    """ remap roi from labels_in to labels_out """
+    labels_rev = {key: idx for idx, key in labels_in.items()}
+    roi2 = roi * 0
+    for new, key in labels_out.items():
+        if ignore_zero and new == 0:
+            continue
+        old = labels_rev.get(key)
+        if old is None and ignore_missing:
+            continue
+        elif old is None:
+            raise ValueError(f'Missing input label: {key}')
+        roi2[roi == old] = new
+    return roi2
+
                 
 
 class BinaryMetrics:
@@ -75,9 +147,9 @@ class BinaryMetrics:
         return (bd_ref & bd_pred).sum() / (bd_ref | bd_pred).sum()
 
 
-    def nds(self):
+    def nsd(self):
         """ normalized surface distance """
-        tau = self.options['nds.tau']
+        tau = self.options['nsd.tau']
         d = tau / self.spacing
         bd_ref = boundary(self.ref, ignore=self.ignore)
         br_ref = border_region(self.ref, d=d, ignore=self.ignore)
@@ -144,3 +216,96 @@ def binary_erosion(mask, *, rd=1, ignore=None):
     dil = binary_dilation(mask, rd=rd, ignore=ignore)
     return ~dil if ignore is None else ~dil & ~ignore
     
+#
+# plot
+
+MPL_STYLE = {
+    'boxplot.boxprops.color': 'C0',
+    'boxplot.capprops.color': 'C0',
+    'boxplot.capprops.linewidth': 0.0,
+    'boxplot.medianprops.color': 'C0',
+    'boxplot.medianprops.linewidth': 1.5,
+    'boxplot.flierprops.color': 'C0',
+    'boxplot.flierprops.marker': '.',
+    'boxplot.flierprops.markerfacecolor': 'C0',
+    'boxplot.flierprops.markeredgecolor': 'C0',
+    'boxplot.whiskerprops.color': 'C0',
+    'axes.prop_cycle': plt.cycler('color', plt.cm.plasma(np.linspace(0, 1, 5))),
+    'axes.spines.top': False,
+    'axes.spines.right': False, 
+    'figure.subplot.hspace': 0.03,
+    'figure.constrained_layout.hspace': 0.1,
+}
+
+@mpl.rc_context(MPL_STYLE)
+def plot_metrics(data, *, summary=None, detailed=[], title=None, figsize=(8, 12)):
+
+    if not summary:
+        summary = {item for row in data for item in row} - {'index', 'label'}
+
+    # num rows, columns
+    n1 = len(summary)
+    n2 = len(detailed)
+    nr1 = int(np.sqrt(n1) + 0.5)
+    ncols = -(-n1 // nr1) # ceil
+    nrows = nr1 + n2
+
+    # gridspec
+    fig = plt.figure(constrained_layout=True, figsize=figsize)
+    gs = fig.add_gridspec(nrows, ncols)
+
+    indices = sorted({row['index'] for row in data})
+    labels = sorted({row['label'] for row in data})
+    mean_std = {}
+    for i, metric in enumerate(summary):
+        # set axis
+        fig.add_subplot(gs[i//ncols, i%ncols])
+        # mean data per index
+        values = [
+            np.mean([row[metric] for row in data if (row['index']==idx) and (row[metric] is not None)]) 
+            for idx in indices
+        ]
+        mean_std[metric] = (np.mean(values), np.std(values))
+        mean_std_str = f'${mean_std[metric][0]:.2f}\\pm{mean_std[metric][1]:.2f}${METRICS[metric]["unit"]}'
+        # plot
+        plt.boxplot([values])
+        plt.title(METRICS[metric]['short'] + f'\n{mean_std_str}')
+        plt.xticks([], [])
+        plt.ylim(METRICS[metric]['range'])
+        ylim = plt.ylim()
+        plt.yticks(np.linspace(round(ylim[0]), round(ylim[1]), 5))
+        # plt.grid(axis='y')
+        plt.gca().yaxis.set_major_formatter(plt.FormatStrFormatter('%.2f'))
+        # labels, ticks etc.
+        # scales
+    
+    for i, metric in enumerate(detailed):
+        # set axis
+        fig.add_subplot(gs[nr1 + i, :])
+        # data per label
+        values = [
+            np.array([row[metric] for row in data if (row['label']==lb) and (row[metric] is not None)]) 
+            for lb in labels
+        ]
+        # plot
+        plt.boxplot(values)
+        unit = METRICS[metric]['unit']
+        plt.title(METRICS[metric]['short'] + bool(unit) * f' ({unit})')
+        plt.xticks(np.arange(len(values)) + 1, labels=labels, rotation=45, ha='right')
+        plt.ylim(METRICS[metric]['range'])
+        ylim = plt.ylim()
+        plt.yticks(np.linspace(round(ylim[0]), round(ylim[1]), 5))
+        # plt.grid(axis='y')
+        plt.gca().yaxis.set_major_formatter(plt.FormatStrFormatter('%.2f'))
+        plt.axhline(mean_std[metric][0], color='k', alpha=0.3, zorder=0, linewidth=1)
+
+    if title is not None:
+        plt.suptitle(title + '\n')
+    return fig
+
+
+def round(num):
+    """ precision-dependent round"""
+    if np.isclose(num, 0):
+        return 0.0
+    return np.round(num, 1 - int(np.log10(num)))

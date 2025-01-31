@@ -56,8 +56,8 @@ def segment(images, dest, dirname, filename, format, model, side, tempdir, verbo
     root = pathlib.Path(root) if root else pathlib.Path(".")
 
     if not images:
-        models = api.list_models()
         # no argument: list available models
+        models = api.list_models()
         click.echo("Available segmentation models:")
         for available_model in models:
             click.echo(f"\t{available_model}")
@@ -69,19 +69,15 @@ def segment(images, dest, dirname, filename, format, model, side, tempdir, verbo
     except ValueError as exc:
         click.echo(f'Error: {exc}')
         sys.exit(1)
-
-    if model == "fabianbalsiger/museg:thigh-model3":
-        nchannel = 2
-    else:
-        nchannel = int(model_info["nchannel"])
+    nchannel = int(model_info["nchannel"])
 
     if 1 < len(images) != nchannel:
         click.echo(f"Expecting {nchannel} channels, got {len(images)} expression(s).")
         sys.exit(1)
 
+    # find images
     image_files = []
     for expr in images:
-        # find images
         if pathlib.Path(expr).is_absolute():
             # assume a directory
             click.echo(f"\tAbsolute paths are not accepted: {expr}")
@@ -291,6 +287,207 @@ def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, des
         nepoch=nepoch,
         continue_training=continue_training,
     )
+
+
+@cli.command(context_settings={"show_default": True})
+@click.argument("model")
+@click.argument("data", nargs=-1)
+# @click.option('-o', "--overwrite", is_flag=True, help="Overwrite already existing files.")
+@click.option("-r", "--root", type=click.Path(exists=True), help="Input root directory.")
+@click.option("-d", "--dest", type=click.Path(), help="Output root directory.")
+@click.option("--filename", default="roi", help="Segmentation filename.")
+@click.option("--dirname", help="Segmentation parent folder.")
+@click.option("-f", "--format", default=".nii.gz", type=click.Choice([".nii.gz", ".mha", ".mhd", ".hdr"]))
+@click.option("--side", default="LR", type=click.Choice(["L", "R", "LR", "NA"]), help="Limb's side(s) in image")
+@click.option("--tempdir", type=click.Path(exists=True), help="Location for nnUNet temporary files.")
+@click.option("-v", "--verbose", is_flag=True, help="Show more information")
+def test(model, data, root, dest, filename, dirname, format, side, tempdir, verbose):
+    """Test segmentation model
+
+    \b  
+    case 1: DATA = images references
+        Inference on images if run first.
+    case 2: DATA = images predictions references
+        Predictions are provided, inference is not run.
+
+    """
+    if verbose:
+        logging.basicConfig(level=logging.INFO)
+
+    # copy inputs to outputs
+    copy_inputs = (dirname is not None) or (dest is not None)
+
+    # root directory
+    root = pathlib.Path(root) if root else pathlib.Path(".")
+
+    if not data:
+        # no argument: list available models
+        models = api.list_models()
+        click.echo("Available segmentation models:")
+        for available_model in models:
+            click.echo(f"\t{available_model}")
+        sys.exit(0)
+
+    elif len(data) == 2:
+        images, refs = data
+        preds = None
+
+    elif len(data) == 3:
+        images, preds, refs = data
+    
+    else:
+        click.echo(f"Invalid number of data arguments: {len(data)}")
+        sys.exit(0)
+
+    # make inference?
+    make_inference = preds is None
+
+    # side
+    if side == "NA":
+        side = None
+
+    # get nchannel from model metadata
+    try:
+        model_info = api.get_model_info(model)
+    except ValueError as exc:
+        click.echo(f'Error: {exc}')
+        sys.exit(1)
+    nchannel = int(model_info["nchannel"])
+
+    # find images
+    if pathlib.Path(images).is_absolute():
+        # assume a directory
+        image_files = sorted(pathlib.Path(images).rglob("*"))
+        refs_files = sorted(pathlib.Path(refs).rglob("*"))
+        preds_files = None if preds is None else sorted(pathlib.Path(preds).rglob("*"))
+    else:
+        root = pathlib.Path(root) if root else pathlib.Path(".")
+        image_files = sorted(root.rglob(images))
+        refs_files = sorted(root.rglob(refs))
+        preds_files = None if preds is None else sorted(root.rglob(preds))
+
+    if not image_files:
+        click.echo(f"No image file found, check expression: {images}")
+    if not refs_files:
+        click.echo(f"No reference label file found, check expression: {refs}")
+    if preds and not refs_files:
+        click.echo(f"No prediction label file found, check expression: {preds}")
+
+    # sort images
+    regex = re.compile(r"(.+?)(\d*)\.([\.\w]+)$")
+    images = {}
+    for file in image_files:
+        match = regex.match(str(file))
+        if not match or not api.is_image(file):
+            continue
+        prefix, index, ext = match.groups()
+        images.setdefault(prefix, []).append(file)
+
+    # sort predictions
+    if preds:
+        regex = re.compile(r"(.+?)\.([\.\w]+)$")
+        preds = {}
+        for file in preds_files:
+            match = regex.match(str(file))
+            if not match or not api.is_image(file):
+                continue
+            prefix, ext = match.groups()
+            preds[prefix] = file
+
+    # sort references
+    regex = re.compile(r"(.+?)(20\d\d\d\d\d\d)(.+)")
+    refs, refs_dates = {}, {}
+    for file in refs_files:
+        match = regex.match(str(file))
+        if not api.is_image(file):
+            continue
+        elif not match:  # no date
+            prefix = str(file)
+            date = 0
+        else:
+            prefix, date, _ = match.groups()
+        refs.setdefault(prefix, []).append(file)
+        refs_dates.setdefault(prefix, []).append(date)
+
+    # destination
+    names = sorted(images)
+    dest = pathlib.Path(root if dest is None else dest)
+    dest.mkdir(exist_ok=True, parents=True)
+    destloc = {name: images[name][0].relative_to(root).parent for name in names}
+    if dirname:
+        destloc = {name: loc.parent / dirname for name, loc in destloc.items()}
+    
+
+    # list images and label files
+    images = [tuple(sorted(images[prefix]))[:nchannel] for prefix in sorted(images)]
+    refs = [tuple(sorted(refs[prefix]))[-1] for prefix in sorted(refs)]
+    refs_dates = tuple(refs_dates.values())
+    if preds:
+        preds = [preds[prefix] for prefix in sorted(preds)]
+    nimage = len(images)
+
+    # check images
+    if not images:
+        click.echo(f"No image files were found")
+        sys.exit(0)
+
+    # check number of references
+    if len(refs) != nimage:
+        click.echo(f"Error: found {nimage} images and {len(refs)} reference labels.")
+        for ims in images:
+            click.echo(f'\t{", ".join(map(str, ims))}')
+        for im in refs:
+            click.echo(f"\t{im}")
+        sys.exit(0)
+
+    # check predictions
+    if preds and len(preds) != nimage:
+        click.echo(f"Error: found {nimage} images and {len(refs)} reference labels.")
+        for ims in images:
+            click.echo(f'\t{", ".join(map(str, ims))}')
+        for im in preds:
+            click.echo(f"\t{im}")
+        sys.exit(0)
+
+    # check num channels
+    channels = {len(ims) for ims in images}
+    if not channels == {nchannel}:
+        click.echo(f"Error: invalid number of channels (must be {nchannel})")
+        for ims in images:
+            click.echo(f'\t{", ".join(map(str, ims))}')
+        sys.exit(0)
+
+    # check test data
+    click.echo(f"Found {len(images)} images and matching rois:")
+    for i in range(nimage):
+        click.echo(f"({i+1})")
+        for j in range(nchannel):
+            click.echo(f"\tchan. {j + 1:02d}: {images[i][j]}")
+        click.echo(f"\tref.:   {refs[i]}")
+        if len(refs_dates[i]) > 1:
+            click.echo(f'\t(latest among: {", ".join(refs_dates[i])})')
+        if preds:
+            click.echo(f"\tpred.:  {preds[i]}")
+    click.confirm("Are all images/rois correctly matched?", abort=True)
+
+    # prediction
+    if preds is None:
+        preds = {name: (dest / destloc[name] / filename).with_suffix(format) for name in names}
+
+    # test model
+    click.echo(f"Testing {model} on {len(images)} volume(s)...")
+    opts = {
+        "inference": make_inference,
+        'tempdir': tempdir,
+        'copy_inputs': copy_inputs,
+        'side': side,
+        'statsfile': dest / 'stats.csv',
+        'figfile': dest / 'stats.png',
+        'figtitle': f'{model} - {root.relative_to('.')}/',
+    }
+    api.test_model(model, images, refs, preds, **opts)
+    
+    click.echo("Done.")
 
 
 if __name__ == "__main__":

@@ -9,24 +9,6 @@ from . import dockerutils, io
 
 LOGGER = logging.getLogger(__name__)
 
-
-def tame_side(side):
-    if side is None:
-        return "NA"
-    elif not isinstance(side, str):
-        raise TypeError(f"Invalid side value: {side}")
-    side = side.upper().strip().replace(",", "").replace("+", "")
-    if side in ["LEFT", "L"]:
-        return "L"
-    elif side in ["RIGHT", "R"]:
-        return "R"
-    elif side in ["LR", "RL", "LEFTRIGHT", "RIGHTLEFT"]:
-        return "LR"
-    elif side.upper() in ["NONE", "NA"]:
-        return "NA"
-    raise ValueError(f"Unknown side value: {side}")
-
-
 def infer(model, images, outputs=None, *, side=None, tempdir=None, copy_inputs=False):
     """run inference on images
 
@@ -131,3 +113,20 @@ def infer(model, images, outputs=None, *, side=None, tempdir=None, copy_inputs=F
             for chan in images[index]:
                 image = io.load(chan)
                 io.save(filename.parent / chan.name, image)
+
+
+def tame_side(side):
+    if side is None:
+        return "NA"
+    elif not isinstance(side, str):
+        raise TypeError(f"Invalid side value: {side}")
+    side = side.upper().strip().replace(",", "").replace("+", "")
+    if side in ["LEFT", "L"]:
+        return "L"
+    elif side in ["RIGHT", "R"]:
+        return "R"
+    elif side in ["LR", "RL", "LEFTRIGHT", "RIGHTLEFT"]:
+        return "LR"
+    elif side.upper() in ["NONE", "NA"]:
+        return "NA"
+    raise ValueError(f"Unknown side value: {side}")

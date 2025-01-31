@@ -2,14 +2,7 @@ import pathlib
 import re
 import numpy as np
 import SimpleITK as sitk
-
-
-""" todo
-handle labels: 
-- R/L labels?
-- skipped label values
-
-"""
+import csv
 
 
 def is_image(obj):
@@ -193,6 +186,9 @@ class Labels:
             raise ValueError(f"Invalid item type: {item}")
         return dct[item]
 
+    def to_dict(self):
+        return dict(zip(self.indices, self.descriptions))
+
     def append(self, description, *, color=None, transparency=1, visibility=1):
         if color is None:
             color = np.random.randint(0, 255, 3)
@@ -271,3 +267,14 @@ class Labels:
 #  LABEL:   Label description 
 ################################################
 """
+
+
+# write excel
+def save_csv(filename, data):
+    fieldnames = []
+    [key for row in data for key in row if not (key in fieldnames or fieldnames.append(key))]
+    with open(filename, 'w', newline='', encoding='utf-8') as fp:
+        writer = csv.DictWriter(fp, fieldnames=fieldnames, dialect='excel')
+        writer.writeheader()
+        for row in data:
+            writer.writerow(row)

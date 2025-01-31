@@ -12,6 +12,7 @@ dependencies = [
     "SimpleITK",
     "docker",
     "click",
+    "matplotlib",
 ]
 
 [project.optional-dependencies]
