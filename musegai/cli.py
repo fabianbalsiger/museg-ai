@@ -32,19 +32,20 @@ def list():
 @click.option("-r", "--root", type=click.Path(exists=True), help="Input root directory.")
 @click.option("-d", "--dest", type=click.Path(), help="Output root directory.")
 @click.option("--filename", default="roi", help="Segmentation filename.")
-@click.option("--dirname", help="Segmentation parent folder.")
+@click.option("--dirname", help="Segmentation parent folder name.")
 @click.option("-f", "--format", default=".nii.gz", type=click.Choice([".nii.gz", ".mha", ".mhd", ".hdr"]))
 @click.option("--side", default="LR", type=click.Choice(["L", "R", "LR", "NA"]), help="Limb's side(s) in image")
 @click.option("--tempdir", type=click.Path(exists=True), help="Location for nnUNet temporary files.")
 @click.option("-v", "--verbose", is_flag=True, help="Show more information")
 def segment(images, dest, dirname, filename, format, model, side, tempdir, verbose, overwrite, root):
-    """Automatic muscle segmentation command line tool.
+    """Apply segmentation model on dataset
 
     \b
-    IMAGES: file name(s) or pattern(s) of images to segment.
-    Multiple channels are assumed either:
-    - if image files are numbered
-    - if multiple patterns are passed
+    MODEL: segmentation model to use (cf. `museg-ai list`)
+    IMAGES: path expression to specify the images to segment
+        Multiple channels are assumed if:
+        - image files are numbered
+        - multiple path expressions are passed
     
     """
     if verbose:
@@ -164,7 +165,7 @@ def segment(images, dest, dirname, filename, format, model, side, tempdir, verbo
 @cli.command(context_settings={"show_default": True})
 @click.argument("model")
 @click.argument("images")
-@click.argument("rois")
+@click.argument("refs")
 @click.option("--labelfile", type=click.Path(exists=True), required=True, help="ITK-Snap label file")
 @click.option("--train/--no-train", default=True, help="Train model.")
 @click.option("--dockerfile/--no-dockerfile", default=True, help="Make dockerfile.")
@@ -177,8 +178,16 @@ def segment(images, dest, dirname, filename, format, model, side, tempdir, verbo
 # @click.option("--split", is_flag=True, help="Split datasets into left and right parts")
 @click.option("--continue", "continue_training", is_flag=True, help="Continue training.")
 @click.option("-v", "--verbose", is_flag=True)
-def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, dest, verbose, folds, preprocess, nepoch, continue_training):
-    """Create new segmentation model using training images and rois"""
+def train(model, images, refs, train, dockerfile, nchannel, labelfile, root, dest, verbose, folds, preprocess, nepoch, continue_training):
+    """Train segmentation model on dataset
+
+    \b
+    MODEL: segmentation model to create (eg.: `museg-legs:model1`)
+    IMAGES: path expression to specify training images
+    REFS: path expression to specify reference segmentation
+    
+    """
+
     if verbose:
         logging.basicConfig(level=logging.INFO)
     nepoch = int(nepoch)
@@ -201,16 +210,16 @@ def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, des
     if pathlib.Path(images).is_absolute():
         # assume a directory
         image_files = sorted(pathlib.Path(images).rglob("*"))
-        roi_files = sorted(pathlib.Path(rois).rglob("*"))
+        roi_files = sorted(pathlib.Path(refs).rglob("*"))
     else:
         root = pathlib.Path(root) if root else pathlib.Path(".")
         image_files = sorted(root.rglob(images))
-        roi_files = sorted(root.rglob(rois))
+        roi_files = sorted(root.rglob(refs))
 
     if not image_files:
         click.echo(f"No image file found, check expression: {images}")
     if not roi_files:
-        click.echo(f"No label file found, check expression: {rois}")
+        click.echo(f"No label file found, check expression: {refs}")
 
     regex = re.compile(r"(.+?)(\d*)\.([\.\w]+)$")
     images = {}
@@ -296,18 +305,21 @@ def train(model, images, rois, train, dockerfile, nchannel, labelfile, root, des
 @click.option("-r", "--root", type=click.Path(exists=True), help="Input root directory.")
 @click.option("-d", "--dest", type=click.Path(), help="Output root directory.")
 @click.option("--filename", default="roi", help="Segmentation filename.")
-@click.option("--dirname", help="Segmentation parent folder.")
+@click.option("--dirname", help="Segmentation parent folder name.")
 @click.option("-f", "--format", default=".nii.gz", type=click.Choice([".nii.gz", ".mha", ".mhd", ".hdr"]))
 @click.option("--side", default="LR", type=click.Choice(["L", "R", "LR", "NA"]), help="Limb's side(s) in image")
 @click.option("--tempdir", type=click.Path(exists=True), help="Location for nnUNet temporary files.")
 @click.option("-v", "--verbose", is_flag=True, help="Show more information")
 def test(model, data, root, dest, filename, dirname, format, side, tempdir, verbose):
-    """Test segmentation model
+    """Test segmentation model on dataset
 
     \b  
-    case 1: DATA = images references
-        Inference on images if run first.
-    case 2: DATA = images predictions references
+    MODEL: segmentation model to use (cf. `museg-ai list`)
+    DATA: path expressions for: image dataset, [prediction segmentations], reference segmentations
+    \b
+    case 1: DATA = <images> <references>
+        Run inference on images before comparing to references.
+    case 2: DATA = <images> <predictions> <references>
         Predictions are provided, inference is not run.
 
     """
