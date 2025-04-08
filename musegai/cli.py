@@ -495,7 +495,7 @@ def test(model, data, root, dest, filename, dirname, format, side, tempdir, verb
         'side': side,
         'statsfile': dest / 'stats.csv',
         'figfile': dest / 'stats.png',
-        'figtitle': f'{model} - {root.relative_to('.')}/',
+        'figtitle': f'{model} - {root.relative_to(".")}/',
     }
     api.test_model(model, images, refs, preds, **opts)
     
