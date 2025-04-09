@@ -113,7 +113,7 @@ def segment(images, dest, dirname, filename, format, model, side, tempdir, verbo
 
     # check number of channels
     names = sorted(images)
-    numchan = {name: len(images[name]) for name in names if len(images[name]) != nchannel}
+    numchan = {name: len(images[name]) for name in names if len(images[name]) < nchannel}
     if numchan:
         click.echo(f"Did not find {nchannel} channel(s) in:")
         for name in numchan:
