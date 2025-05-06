@@ -40,7 +40,7 @@ dev = [
 ]
 
 [tool.setuptools]
-packages = ["musegai", "musegai.data"]
+packages = ["musegai"]
 include-package-data = true
 py-modules = []  # avoid error with pip-compile, cf. https://github.com/jazzband/pip-tools/issues/1711
 
