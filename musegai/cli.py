@@ -29,6 +29,7 @@ def list():
 @click.argument("model")
 @click.argument("images", nargs=-1)
 @click.option('-o', "--overwrite", is_flag=True, help="Overwrite already existing files.")
+@click.option('-y', "--yes", is_flag=True, help="Bypass confirmation.")
 @click.option("-r", "--root", type=click.Path(exists=True), help="Input root directory.")
 @click.option("-d", "--dest", type=click.Path(), help="Output root directory.")
 @click.option("--filename", default="roi", help="Segmentation filename.")
@@ -37,7 +38,7 @@ def list():
 @click.option("--side", default="LR", type=click.Choice(["L", "R", "LR", "NA"]), help="Limb's side(s) in image")
 @click.option("--tempdir", type=click.Path(exists=True), help="Location for nnUNet temporary files.")
 @click.option("-v", "--verbose", is_flag=True, help="Show more information")
-def segment(images, dest, dirname, filename, format, model, side, tempdir, verbose, overwrite, root):
+def segment(images, dest, dirname, filename, format, model, side, tempdir, verbose, overwrite, yes, root):
     """Apply segmentation model on dataset
 
     \b
@@ -134,7 +135,8 @@ def segment(images, dest, dirname, filename, format, model, side, tempdir, verbo
         for j in range(nchannel):
             click.echo(f"\tchan. {j + 1:02d}: {images[name][j]}")
         click.echo(f"\tlabels:   {labels[name]}")
-    click.confirm("Are all images correctly selected?", abort=True)
+    if not yes:
+        click.confirm("Are all images correctly selected?", abort=True)
 
     # dealing whith already existent files in output directory
     if not overwrite:
