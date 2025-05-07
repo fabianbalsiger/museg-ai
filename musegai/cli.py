@@ -155,8 +155,8 @@ def segment(images, dest, dirname, filename, format, model, side, tempdir, verbo
     if side == "NA":
         side = None
 
-    inputs = [images[name] for name in names]
-    outputs = [labels[name] for name in names]
+    inputs = [images[name] for name in images]
+    outputs = [labels[name] for name in images]
 
     # segment images
     click.echo(f"Segmenting {len(images)} volume(s)...")
