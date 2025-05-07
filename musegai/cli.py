@@ -111,13 +111,14 @@ def segment(images, dest, dirname, filename, format, model, side, tempdir, verbo
                     continue
                 common = file.parent
                 images.setdefault(common, []).append(file)
+    images = {name: sorted(ims)[:nchannel] for name, ims in images.items()}
 
     # check number of channels
     names = sorted(images)
-    numchan = {name: len(images[name]) for name in names if len(images[name]) < nchannel}
-    if numchan:
+    bad_numchan = {name: len(images[name]) for name in names if len(images[name]) < nchannel}
+    if bad_numchan:
         click.echo(f"Did not find {nchannel} channel(s) in:")
-        for name in numchan:
+        for name in bad_numchan:
             click.echo(f'\t{name}: {", ".join(f"[{i + 1}] {file}" for i, file in enumerate(images[name]))}')
         sys.exit(1)
 
