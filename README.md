@@ -47,7 +47,27 @@ museg-ai --help
 
 # Citation
 
-The scientific article is currently under review. Please open an issue if you want to cite it before acceptance.
+If you use this work, please cite:
+
+```
+P.-Y. Baudin*, F. Balsiger*, L. Beck, J.-M. Boisserie, S. Jouan, B. Marty, H. Reyngoudt, O. Scheidegger, "A Minimal Annotation Pipeline for Deep Learning Segmentation of Skeletal Muscles", NMR in Biomedicine 38, no. 7 (2025): e70066, https://doi.org/10.1002/nbm.70066.
+```
+
+```
+@article{BaudinBalsiger2025a,
+author = {Baudin, Pierre-Yves and Balsiger, Fabian and Beck, Lea and Boisserie, Jean-Marc and Jouan, Sophie and Marty, Benjamin and Reyngoudt, Harmen and Scheidegger, Olivier},
+title = {A Minimal Annotation Pipeline for Deep Learning Segmentation of Skeletal Muscles},
+journal = {NMR in Biomedicine},
+volume = {38},
+number = {7},
+pages = {e70066},
+keywords = {automatic segmentation, neuromuscular disorders, nnU-net, quantitative MRI, skeletal muscles},
+doi = {https://doi.org/10.1002/nbm.70066},
+url = {https://analyticalsciencejournals.onlinelibrary.wiley.com/doi/abs/10.1002/nbm.70066},
+year = {2025}
+```
+
+* Pierre-Yves Baudin and Fabian Balsiger contributed equally to this work.
 
 # Development
 
